@@ -1,3 +1,5 @@
+import { GROUND_Y_MAX } from '/shared/constants.js';
+
 export class ParticleSystem {
   constructor() {
     this.particles = [];
@@ -9,11 +11,13 @@ export class ParticleSystem {
     return {};
   }
 
-  emit(type, x, y, count) {
+  emit(type, x, y, count, opts = {}) {
     for (let i = 0; i < count; i++) {
       const p = this._getParticle();
+      p.isOnWall = !!opts.isOnWall;
       p.x = x;
-      p.y = y;
+      // For wall particles, treat y as a local offset around the battlements.
+      p.y = p.isOnWall ? 0 : y;
       p.life = 0;
 
       switch (type) {
@@ -67,15 +71,24 @@ export class ParticleSystem {
   }
 
   render(ctx, camera) {
+    const yScale = camera.groundBandHeight / GROUND_Y_MAX;
     for (const p of this.particles) {
-      const pos = camera.worldToScreen(p.x, p.y);
+      let x, y;
+      if (p.isOnWall) {
+        x = (p.x - camera.x) * camera.scale;
+        y = camera.wallScreenY + p.y * yScale;
+      } else {
+        const pos = camera.worldToScreen(p.x, p.y);
+        x = pos.x;
+        y = pos.y;
+      }
       const alpha = 1 - (p.life / p.maxLife);
       const size = p.size * camera.scale;
 
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.fillStyle = p.color;
-      ctx.fillRect(pos.x - size / 2, pos.y - size / 2, size, size);
+      ctx.fillRect(x - size / 2, y - size / 2, size, size);
       ctx.restore();
     }
   }

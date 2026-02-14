@@ -8,7 +8,8 @@ export class Network {
   }
 
   connect(url) {
-    url = url || `ws://${location.host}`;
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    url = url || `${proto}//${location.host}`;
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {

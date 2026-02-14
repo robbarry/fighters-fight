@@ -8,6 +8,7 @@ class GameLoop {
   }
 
   start() {
+    if (this.interval) return;
     console.log('Game loop started');
     this.interval = setInterval(() => {
       try {
@@ -22,6 +23,7 @@ class GameLoop {
   }
 
   stop() {
+    if (!this.interval) return;
     clearInterval(this.interval);
     this.interval = null;
   }

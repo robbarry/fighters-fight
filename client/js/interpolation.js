@@ -5,6 +5,11 @@ export class Interpolation {
     this._lastPushTime = 0;
   }
 
+  latest() {
+    if (this.snapshots.length === 0) return null;
+    return this.snapshots[this.snapshots.length - 1];
+  }
+
   push(snapshot) {
     this.snapshots.push(snapshot);
     if (this.snapshots.length > this.maxSnapshots) {

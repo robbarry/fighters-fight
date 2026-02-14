@@ -47,6 +47,7 @@ class Projectile {
       Math.round(this.x),
       Math.round(this.y),
       this.ownerId,
+      Math.round(this.distanceTraveled),
     ];
   }
 }

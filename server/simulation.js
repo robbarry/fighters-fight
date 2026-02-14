@@ -317,10 +317,27 @@ class Simulation {
       if (player.state === STATE_RESPAWNING) {
         player.respawnTimer -= dt * 1000;
         if (player.respawnTimer <= 0 && player.lives > 0) {
-          const spawnX = player.team === TEAM_BLUE
-            ? BLUE_GROUND_SPAWN_MIN + 50
-            : RED_GROUND_SPAWN_MAX - 50;
-          const spawnY = Math.random() * GROUND_Y_MAX;
+          let spawnX, spawnY;
+          const isWall = player.role === TYPE_ARCHER || player.role === TYPE_GUNNER;
+
+          if (player.team === TEAM_BLUE) {
+            if (isWall) {
+              spawnX = (BLUE_WALL_SPAWN_MIN + BLUE_WALL_SPAWN_MAX) / 2;
+              spawnY = 30;
+            } else {
+              spawnX = BLUE_GROUND_SPAWN_MIN + 50;
+              spawnY = Math.random() * GROUND_Y_MAX;
+            }
+          } else {
+            if (isWall) {
+              spawnX = (RED_WALL_SPAWN_MIN + RED_WALL_SPAWN_MAX) / 2;
+              spawnY = 30;
+            } else {
+              spawnX = RED_GROUND_SPAWN_MAX - 50;
+              spawnY = Math.random() * GROUND_Y_MAX;
+            }
+          }
+
           player.respawn(spawnX, spawnY);
         }
         continue;
@@ -336,7 +353,19 @@ class Simulation {
 
       // Movement
       const { dx, dy, atk, blk, aimX, aimY } = player.input;
-      if (dx !== 0 || dy !== 0) {
+      if (player.isOnWall) {
+        // Keep wall roles pinned to the battlements lane.
+        player.y = 30;
+        if (dx !== 0) {
+          updateEntityMovement(player, Math.sign(dx), 0, PLAYER_SPEED, dt);
+          // Clamp to the team's wall segment so you can't run the whole map on the wall.
+          const wallMinX = player.team === TEAM_BLUE ? BLUE_WALL_SPAWN_MIN : RED_WALL_SPAWN_MIN;
+          const wallMaxX = player.team === TEAM_BLUE ? BLUE_WALL_SPAWN_MAX : RED_WALL_SPAWN_MAX;
+          if (player.x < wallMinX) player.x = wallMinX;
+          if (player.x > wallMaxX) player.x = wallMaxX;
+          if (player.state !== STATE_BLOCK) player.state = STATE_IDLE;
+        }
+      } else if (dx !== 0 || dy !== 0) {
         const len = Math.sqrt(dx * dx + dy * dy);
         updateEntityMovement(player, dx / len, dy / len, PLAYER_SPEED, dt);
         if (player.state !== STATE_BLOCK) player.state = STATE_IDLE;

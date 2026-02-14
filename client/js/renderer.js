@@ -1,8 +1,9 @@
 import { TEAM_BLUE, TEAM_RED, TYPE_SWORD, TYPE_SPEAR, TYPE_ARCHER, TYPE_GUNNER, TYPE_CATAPULT,
-         STATE_DEAD, STATE_BLOCK, STATE_RESPAWNING, STATE_SPECTATING,
-         BODY_WIDTH, BODY_HEIGHT, HEAD_RADIUS, ROYAL_SCALE,
-         CASTLE_WIDTH, BLUE_CASTLE_X, RED_CASTLE_X, WORLD_WIDTH, GROUND_Y_MAX,
-         GATE_HP, PROJ_ARROW, PROJ_ROCK } from '/shared/constants.js';
+	         STATE_DEAD, STATE_BLOCK, STATE_RESPAWNING, STATE_SPECTATING,
+	         BODY_WIDTH, BODY_HEIGHT, HEAD_RADIUS, ROYAL_SCALE,
+	         CASTLE_WIDTH, BLUE_CASTLE_X, RED_CASTLE_X, WORLD_WIDTH, GROUND_Y_MAX,
+	         GATE_HP, PROJ_ARROW, PROJ_ROCK,
+	         ARROW_RANGE, ROCK_RANGE } from '/shared/constants.js';
 
 const BLUE_COLOR = '#4488ff';
 const BLUE_DARK = '#2266cc';
@@ -21,6 +22,37 @@ export class Renderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.camera = camera;
+
+    // FX state (purely client-side)
+    this._hitFlashMs = 140;
+    this._tracerMs = 120;
+    this._hitTimers = new Map(); // entityId -> ms remaining
+    this._tracers = []; // { attackerId, victimId, ms }
+  }
+
+  update(dtMs) {
+    // Hit flashes
+    for (const [id, ms] of this._hitTimers) {
+      const next = ms - dtMs;
+      if (next <= 0) this._hitTimers.delete(id);
+      else this._hitTimers.set(id, next);
+    }
+
+    // Tracers
+    for (let i = this._tracers.length - 1; i >= 0; i--) {
+      this._tracers[i].ms -= dtMs;
+      if (this._tracers[i].ms <= 0) this._tracers.splice(i, 1);
+    }
+  }
+
+  flashHit(entityId) {
+    if (entityId == null) return;
+    this._hitTimers.set(entityId, this._hitFlashMs);
+  }
+
+  addTracer(attackerId, victimId) {
+    if (attackerId == null || victimId == null) return;
+    this._tracers.push({ attackerId, victimId, ms: this._tracerMs });
   }
 
   render(snapshot, localPlayerId) {
@@ -82,6 +114,13 @@ export class Renderer {
       return a.y - b.y;
     });
 
+    // Fast lookup for FX rendering
+    const byId = new Map();
+    for (const d of drawables) byId.set(d.id, d);
+
+    // Tracers (ex: hitscan feedback)
+    this.drawTracers(byId);
+
     // Draw entities
     for (const d of drawables) {
       if (!cam.isOnScreen(d.x)) continue;
@@ -98,8 +137,56 @@ export class Renderer {
       for (const p of snapshot.projectiles) {
         if (!cam.isOnScreen(p[3])) continue;
         this.drawProjectile(p);
-      }
+	  }
+	}
+  }
+
+  drawTracers(byId) {
+    if (this._tracers.length === 0) return;
+    const ctx = this.ctx;
+    const cam = this.camera;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+
+    for (const tr of this._tracers) {
+      const a = byId.get(tr.attackerId);
+      const v = byId.get(tr.victimId);
+      if (!a || !v) continue;
+
+      // If both ends are far off screen, skip.
+      if (!cam.isOnScreen(a.x) && !cam.isOnScreen(v.x)) continue;
+
+      const pa = cam.worldToScreen(a.x, a.y, a.isOnWall);
+      const pv = cam.worldToScreen(v.x, v.y, v.isOnWall);
+
+      const aScale = a.isRoyal ? ROYAL_SCALE : 1;
+      const vScale = v.isRoyal ? ROYAL_SCALE : 1;
+      const aY = pa.y - BODY_HEIGHT * cam.scale * aScale * 0.7;
+      const vY = pv.y - BODY_HEIGHT * cam.scale * vScale * 0.7;
+
+      const alpha = Math.max(0, Math.min(1, tr.ms / this._tracerMs));
+
+      // Glow pass
+      ctx.globalAlpha = 0.20 * alpha;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 6 * cam.scale;
+      ctx.beginPath();
+      ctx.moveTo(pa.x, aY);
+      ctx.lineTo(pv.x, vY);
+      ctx.stroke();
+
+      // Core pass
+      ctx.globalAlpha = 0.75 * alpha;
+      ctx.strokeStyle = '#ffdd44';
+      ctx.lineWidth = 2.2 * cam.scale;
+      ctx.beginPath();
+      ctx.moveTo(pa.x, aY);
+      ctx.lineTo(pv.x, vY);
+      ctx.stroke();
     }
+
+    ctx.restore();
   }
 
   drawEntity(d) {
@@ -115,117 +202,333 @@ export class Renderer {
 
     // Animation tier: near camera center gets full detail
     const dist = cam.distFromCenter(d.x);
-    const fullDetail = dist < 400;
+    const fullDetail = d.isLocal || d.isRoyal || dist < 520;
+
+    const now = performance.now() / 1000;
+    const walkT = now * 7 + d.id * 0.23;
+    const moving = !d.isOnWall && d.state !== STATE_BLOCK;
+    const walk = moving ? Math.sin(walkT) : 0;
+    const bob = moving ? Math.abs(Math.sin(walkT)) * 1.5 * cam.scale : 0;
+
+    const feetX = pos.x;
+    const feetY = pos.y + bob;
+
+    const legH = bh * 0.45;
+    const torsoH = bh * 0.62;
+    const torsoW = bw * 0.95;
+
+    const hipY = feetY;
+    const torsoBottomY = hipY - legH;
+    const torsoTopY = torsoBottomY - torsoH;
+
+    const skin = '#f2c9a0';
+    const skinStroke = '#c48f6a';
+    const pants = '#2b2e3a';
+    const boots = '#1e1b18';
+    const metal = '#b7b7b7';
+    const metalDark = '#8a8a8a';
+
+    const weaponDir = d.facing === 0 ? 1 : -1;
+
+    const flashMs = this._hitTimers.get(d.id) || 0;
+    const flashA = flashMs > 0 ? Math.max(0, Math.min(1, flashMs / this._hitFlashMs)) : 0;
+
+    function roundRectPath(ctx2, x, y, w, h, r) {
+      ctx2.beginPath();
+      if (ctx2.roundRect) {
+        ctx2.roundRect(x, y, w, h, r);
+        return;
+      }
+      const rr = Math.min(r, w / 2, h / 2);
+      ctx2.moveTo(x + rr, y);
+      ctx2.lineTo(x + w - rr, y);
+      ctx2.quadraticCurveTo(x + w, y, x + w, y + rr);
+      ctx2.lineTo(x + w, y + h - rr);
+      ctx2.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+      ctx2.lineTo(x + rr, y + h);
+      ctx2.quadraticCurveTo(x, y + h, x, y + h - rr);
+      ctx2.lineTo(x, y + rr);
+      ctx2.quadraticCurveTo(x, y, x + rr, y);
+      ctx2.closePath();
+    }
 
     ctx.save();
 
-    // Player glow
-    if (d.isLocal) {
-      ctx.shadowColor = '#ffdd44';
-      ctx.shadowBlur = 15 * cam.scale;
-    } else if (d.isPlayer) {
-      ctx.shadowColor = '#ffffff';
-      ctx.shadowBlur = 8 * cam.scale;
-    }
-
-    // Royal glow
-    if (d.isRoyal) {
-      ctx.shadowColor = '#ffdd44';
-      ctx.shadowBlur = 12 * cam.scale;
-    }
-
-    // Body
-    ctx.fillStyle = color;
-    ctx.fillRect(pos.x - bw / 2, pos.y - bh, bw, bh);
-
-    // Body outline
-    ctx.strokeStyle = darkColor;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(pos.x - bw / 2, pos.y - bh, bw, bh);
-
-    ctx.shadowBlur = 0;
-
-    // Head
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y - bh - hr, hr, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffddaa';
-    ctx.fill();
-    ctx.strokeStyle = '#cc9966';
-    ctx.stroke();
-
-    // Eyes (look in facing direction)
-    if (fullDetail) {
-      const eyeOffset = (d.facing === 0 ? 1 : -1) * hr * 0.3;
+    // Shadow (ground units only)
+    if (!d.isOnWall) {
+      ctx.save();
+      ctx.globalAlpha = 0.20;
       ctx.fillStyle = '#000';
       ctx.beginPath();
-      ctx.arc(pos.x + eyeOffset, pos.y - bh - hr, hr * 0.2, 0, Math.PI * 2);
+      ctx.ellipse(feetX, feetY + 2 * cam.scale, bw * 0.55, bw * 0.18, 0, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
     }
 
-    // Weapon
+    // Glow (players + royals)
+    if (d.isLocal) {
+      ctx.shadowColor = '#ffdd44';
+      ctx.shadowBlur = 16 * cam.scale;
+    } else if (d.isPlayer) {
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 9 * cam.scale;
+    }
+    if (d.isRoyal) {
+      ctx.shadowColor = '#ffdd44';
+      ctx.shadowBlur = 14 * cam.scale;
+    }
+
+    // Legs (skip for wall units to keep the illusion they're on battlements)
+    if (!d.isOnWall) {
+      const legSwing = fullDetail ? walk * 0.7 : 0;
+      const legSpread = bw * 0.18;
+      const kneeLift = Math.max(0, walk) * legH * 0.15;
+
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 3.2 * cam.scale * scale;
+      ctx.strokeStyle = pants;
+
+      // Left leg
+      ctx.beginPath();
+      ctx.moveTo(feetX - legSpread, torsoBottomY);
+      ctx.lineTo(feetX - legSpread + legSwing * 6 * cam.scale, hipY - kneeLift);
+      ctx.stroke();
+      // Right leg
+      ctx.beginPath();
+      ctx.moveTo(feetX + legSpread, torsoBottomY);
+      ctx.lineTo(feetX + legSpread - legSwing * 6 * cam.scale, hipY);
+      ctx.stroke();
+
+      // Boots
+      ctx.strokeStyle = boots;
+      ctx.lineWidth = 4.2 * cam.scale * scale;
+      ctx.beginPath();
+      ctx.moveTo(feetX - legSpread - 2 * cam.scale, hipY);
+      ctx.lineTo(feetX - legSpread + 4 * cam.scale, hipY);
+      ctx.moveTo(feetX + legSpread - 4 * cam.scale, hipY);
+      ctx.lineTo(feetX + legSpread + 2 * cam.scale, hipY);
+      ctx.stroke();
+    }
+
+    // Torso (tunic/armor)
+    const torsoX = feetX - torsoW / 2;
+    const torsoY = torsoTopY;
+    const torsoR = 4 * cam.scale * scale;
+
+    // Underlayer for depth
+    roundRectPath(ctx, torsoX, torsoY + 1 * cam.scale, torsoW, torsoH, torsoR);
+    ctx.fillStyle = darkColor;
+    ctx.globalAlpha = 0.55;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    roundRectPath(ctx, torsoX, torsoY, torsoW, torsoH, torsoR);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    // Belt
     if (fullDetail) {
-      const weaponDir = d.facing === 0 ? 1 : -1;
-      const weaponX = pos.x + weaponDir * bw / 2;
-      const weaponY = pos.y - bh * 0.6;
+      ctx.fillStyle = '#3b2a1a';
+      ctx.fillRect(torsoX, torsoY + torsoH * 0.62, torsoW, 3 * cam.scale * scale);
+      ctx.fillStyle = '#d1b07a';
+      ctx.fillRect(
+        feetX - 2 * cam.scale * scale,
+        torsoY + torsoH * 0.60,
+        4 * cam.scale * scale,
+        6 * cam.scale * scale
+      );
+    }
+
+    // Arms (full detail only)
+    if (fullDetail) {
+      const shoulderY = torsoY + torsoH * 0.25;
+      const armLen = torsoH * 0.55;
+      const armSwing = moving ? walk * 0.6 : 0;
+
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 3.0 * cam.scale * scale;
+      ctx.strokeStyle = metalDark;
+
+      // Back arm
+      ctx.beginPath();
+      ctx.moveTo(feetX - weaponDir * torsoW * 0.35, shoulderY);
+      ctx.lineTo(
+        feetX - weaponDir * torsoW * 0.35 + (-weaponDir) * armLen * 0.35,
+        shoulderY + armLen * 0.55 + Math.abs(armSwing) * 2 * cam.scale
+      );
+      ctx.stroke();
+
+      // Front arm (weapon arm)
+      ctx.strokeStyle = metal;
+      ctx.beginPath();
+      ctx.moveTo(feetX + weaponDir * torsoW * 0.35, shoulderY);
+      ctx.lineTo(
+        feetX + weaponDir * torsoW * 0.35 + weaponDir * armLen * 0.55,
+        shoulderY + armLen * 0.30 - armSwing * 3 * cam.scale
+      );
+      ctx.stroke();
+    }
+
+    // Head
+    const headX = feetX;
+    const headY = torsoY - hr * 0.9;
+    ctx.beginPath();
+    ctx.arc(headX, headY, hr, 0, Math.PI * 2);
+    ctx.fillStyle = skin;
+    ctx.fill();
+    ctx.strokeStyle = skinStroke;
+    ctx.lineWidth = 1.5 * cam.scale * scale;
+    ctx.stroke();
+
+    // Helmet for non-archers (slightly more "real")
+    if (fullDetail && !d.isRoyal && d.type !== TYPE_ARCHER) {
+      ctx.fillStyle = metal;
+      ctx.beginPath();
+      ctx.arc(headX, headY - hr * 0.2, hr * 1.05, Math.PI, 0);
+      ctx.fill();
+      ctx.strokeStyle = metalDark;
+      ctx.stroke();
+    }
+
+    // Face
+    if (fullDetail) {
+      const eyeDir = weaponDir;
+      const ex = headX + eyeDir * hr * 0.25;
+      const ey = headY - hr * 0.15;
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.arc(ex, ey, hr * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(ex + eyeDir * hr * 0.35, ey, hr * 0.14, 0, Math.PI * 2);
+      ctx.fill();
+      // Mouth
+      ctx.strokeStyle = 'rgba(20, 10, 10, 0.5)';
+      ctx.lineWidth = 1.2 * cam.scale * scale;
+      ctx.beginPath();
+      ctx.arc(headX, headY + hr * 0.25, hr * 0.35, 0, Math.PI);
+      ctx.stroke();
+    }
+
+    // Weapon + shield (full detail)
+    if (fullDetail) {
+      const weaponX = feetX + weaponDir * torsoW * 0.55;
+      const weaponY = torsoY + torsoH * 0.45;
 
       ctx.strokeStyle = '#888';
-      ctx.lineWidth = 2 * cam.scale;
+      ctx.lineWidth = 2.2 * cam.scale * scale;
+      ctx.lineCap = 'round';
 
-      switch (d.type) {
-        case TYPE_SWORD:
+      // Default weapon for royals: sword
+      const weaponType = d.isRoyal ? TYPE_SWORD : d.type;
+
+      switch (weaponType) {
+        case TYPE_SWORD: {
+          // Blade
+          ctx.strokeStyle = metal;
+          ctx.lineWidth = 2.6 * cam.scale * scale;
           ctx.beginPath();
           ctx.moveTo(weaponX, weaponY);
-          ctx.lineTo(weaponX + weaponDir * 15 * cam.scale, weaponY - 5 * cam.scale);
+          ctx.lineTo(weaponX + weaponDir * 16 * cam.scale * scale, weaponY - 8 * cam.scale * scale);
+          ctx.stroke();
+          // Hilt
+          ctx.strokeStyle = '#6b4a2a';
+          ctx.lineWidth = 3.2 * cam.scale * scale;
+          ctx.beginPath();
+          ctx.moveTo(weaponX, weaponY);
+          ctx.lineTo(weaponX - weaponDir * 4 * cam.scale * scale, weaponY + 2 * cam.scale * scale);
           ctx.stroke();
           break;
-        case TYPE_SPEAR:
+        }
+        case TYPE_SPEAR: {
+          ctx.strokeStyle = '#6b4a2a';
+          ctx.lineWidth = 2.6 * cam.scale * scale;
           ctx.beginPath();
           ctx.moveTo(weaponX, weaponY);
-          ctx.lineTo(weaponX + weaponDir * 25 * cam.scale, weaponY - 3 * cam.scale);
+          ctx.lineTo(weaponX + weaponDir * 34 * cam.scale * scale, weaponY - 4 * cam.scale * scale);
           ctx.stroke();
-          // Spear tip
-          ctx.fillStyle = '#aaa';
+          // Tip
+          ctx.fillStyle = metal;
           ctx.beginPath();
-          ctx.moveTo(weaponX + weaponDir * 25 * cam.scale, weaponY - 6 * cam.scale);
-          ctx.lineTo(weaponX + weaponDir * 30 * cam.scale, weaponY - 3 * cam.scale);
-          ctx.lineTo(weaponX + weaponDir * 25 * cam.scale, weaponY);
+          ctx.moveTo(weaponX + weaponDir * 34 * cam.scale * scale, weaponY - 7 * cam.scale * scale);
+          ctx.lineTo(weaponX + weaponDir * 42 * cam.scale * scale, weaponY - 4 * cam.scale * scale);
+          ctx.lineTo(weaponX + weaponDir * 34 * cam.scale * scale, weaponY - 1 * cam.scale * scale);
           ctx.fill();
           break;
-        case TYPE_ARCHER:
+        }
+        case TYPE_ARCHER: {
+          ctx.strokeStyle = '#6b4a2a';
+          ctx.lineWidth = 2.4 * cam.scale * scale;
           ctx.beginPath();
           ctx.arc(
-            weaponX + weaponDir * 5 * cam.scale, weaponY, 8 * cam.scale,
-            d.facing === 0 ? -Math.PI / 2 : Math.PI / 2,
-            d.facing === 0 ? Math.PI / 2 : -Math.PI / 2
+            weaponX + weaponDir * 6 * cam.scale * scale,
+            weaponY,
+            10 * cam.scale * scale,
+            weaponDir > 0 ? -Math.PI / 2 : Math.PI / 2,
+            weaponDir > 0 ? Math.PI / 2 : -Math.PI / 2
           );
           ctx.stroke();
+          // String
+          ctx.strokeStyle = '#ddd';
+          ctx.lineWidth = 1.2 * cam.scale * scale;
+          ctx.beginPath();
+          ctx.moveTo(weaponX + weaponDir * 6 * cam.scale * scale, weaponY - 10 * cam.scale * scale);
+          ctx.lineTo(weaponX + weaponDir * 6 * cam.scale * scale, weaponY + 10 * cam.scale * scale);
+          ctx.stroke();
           break;
-        case TYPE_GUNNER:
-          ctx.lineWidth = 3 * cam.scale;
+        }
+        case TYPE_GUNNER: {
+          ctx.strokeStyle = '#333';
+          ctx.lineWidth = 4.0 * cam.scale * scale;
           ctx.beginPath();
           ctx.moveTo(weaponX, weaponY);
-          ctx.lineTo(weaponX + weaponDir * 20 * cam.scale, weaponY);
+          ctx.lineTo(weaponX + weaponDir * 22 * cam.scale * scale, weaponY - 1 * cam.scale * scale);
           ctx.stroke();
-          break;
-        case TYPE_CATAPULT:
-          ctx.lineWidth = 3 * cam.scale;
+          // Barrel highlight
+          ctx.strokeStyle = '#777';
+          ctx.lineWidth = 2.0 * cam.scale * scale;
           ctx.beginPath();
-          ctx.moveTo(pos.x, weaponY);
-          ctx.lineTo(pos.x + weaponDir * 12 * cam.scale, weaponY - 15 * cam.scale);
+          ctx.moveTo(weaponX + weaponDir * 4 * cam.scale * scale, weaponY - 1 * cam.scale * scale);
+          ctx.lineTo(weaponX + weaponDir * 22 * cam.scale * scale, weaponY - 2 * cam.scale * scale);
           ctx.stroke();
           break;
+        }
+        case TYPE_CATAPULT: {
+          // Stylized lever / sling
+          ctx.strokeStyle = '#6b4a2a';
+          ctx.lineWidth = 4.0 * cam.scale * scale;
+          ctx.beginPath();
+          ctx.moveTo(feetX, weaponY + 8 * cam.scale * scale);
+          ctx.lineTo(feetX + weaponDir * 14 * cam.scale * scale, weaponY - 16 * cam.scale * scale);
+          ctx.stroke();
+          ctx.fillStyle = '#444';
+          ctx.beginPath();
+          ctx.arc(feetX + weaponDir * 14 * cam.scale * scale, weaponY - 16 * cam.scale * scale, 4 * cam.scale * scale, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
       }
 
-      // Shield for sword type when blocking
-      if (d.type === TYPE_SWORD && d.state === STATE_BLOCK) {
-        const shieldDir = d.facing === 0 ? 1 : -1;
-        ctx.fillStyle = '#8B7355';
-        ctx.fillRect(
-          pos.x + shieldDir * bw / 2 - (shieldDir > 0 ? 0 : 6 * cam.scale),
-          pos.y - bh * 0.8,
-          6 * cam.scale,
-          bh * 0.6
-        );
+      // Shield (sword+shield only, and big/obvious when blocking)
+      if (weaponType === TYPE_SWORD) {
+        const shieldX = feetX - weaponDir * torsoW * 0.65;
+        const shieldY = torsoY + torsoH * 0.55;
+        const sw = 10 * cam.scale * scale;
+        const sh = 14 * cam.scale * scale;
+        const showShield = d.state === STATE_BLOCK || d.isPlayer || d.isRoyal;
+
+        if (showShield) {
+          roundRectPath(ctx, shieldX - sw / 2, shieldY - sh / 2, sw, sh, 4 * cam.scale * scale);
+          ctx.fillStyle = '#7a5a3a';
+          ctx.fill();
+          ctx.strokeStyle = '#3b2a1a';
+          ctx.lineWidth = 2 * cam.scale * scale;
+          ctx.stroke();
+          ctx.fillStyle = '#d1b07a';
+          ctx.beginPath();
+          ctx.arc(shieldX, shieldY, 2.2 * cam.scale * scale, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
 
@@ -233,17 +536,17 @@ export class Renderer {
     if (d.isRoyal) {
       // Crown
       ctx.fillStyle = '#ffdd00';
-      const crownY = pos.y - bh - hr * 2 - 4 * cam.scale;
+      const crownY = torsoTopY - hr * 1.6;
       const crownW = hr * 2;
       const crownH = 6 * cam.scale;
       ctx.beginPath();
-      ctx.moveTo(pos.x - crownW / 2, crownY + crownH);
-      ctx.lineTo(pos.x - crownW / 2, crownY + crownH / 2);
-      ctx.lineTo(pos.x - crownW / 4, crownY + crownH);
-      ctx.lineTo(pos.x, crownY);
-      ctx.lineTo(pos.x + crownW / 4, crownY + crownH);
-      ctx.lineTo(pos.x + crownW / 2, crownY + crownH / 2);
-      ctx.lineTo(pos.x + crownW / 2, crownY + crownH);
+      ctx.moveTo(feetX - crownW / 2, crownY + crownH);
+      ctx.lineTo(feetX - crownW / 2, crownY + crownH / 2);
+      ctx.lineTo(feetX - crownW / 4, crownY + crownH);
+      ctx.lineTo(feetX, crownY);
+      ctx.lineTo(feetX + crownW / 4, crownY + crownH);
+      ctx.lineTo(feetX + crownW / 2, crownY + crownH / 2);
+      ctx.lineTo(feetX + crownW / 2, crownY + crownH);
       ctx.closePath();
       ctx.fill();
 
@@ -251,11 +554,21 @@ export class Renderer {
       const capeDir = d.facing === 0 ? -1 : 1;
       ctx.fillStyle = d.team === TEAM_BLUE ? '#2255aa' : '#aa2222';
       ctx.beginPath();
-      ctx.moveTo(pos.x + capeDir * bw * 0.3, pos.y - bh);
-      ctx.lineTo(pos.x + capeDir * bw * 0.3, pos.y);
-      ctx.lineTo(pos.x + capeDir * bw, pos.y + 5 * cam.scale);
+      ctx.moveTo(feetX + capeDir * bw * 0.2, torsoY);
+      ctx.lineTo(feetX + capeDir * bw * 0.25, feetY);
+      ctx.lineTo(feetX + capeDir * bw * 0.9, feetY + 6 * cam.scale);
       ctx.closePath();
       ctx.fill();
+    }
+
+    // Hit flash overlay (make damage obvious)
+    if (flashA > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.20 * flashA;
+      ctx.fillStyle = '#ffffff';
+      roundRectPath(ctx, torsoX - 3 * cam.scale, torsoY - 3 * cam.scale, torsoW + 6 * cam.scale, torsoH + 6 * cam.scale, torsoR + 3 * cam.scale);
+      ctx.fill();
+      ctx.restore();
     }
 
     // Health bar (only if damaged)
@@ -263,7 +576,7 @@ export class Renderer {
       const barW = 20 * cam.scale * scale;
       const barH = 3 * cam.scale;
       const barX = pos.x - barW / 2;
-      const barY = pos.y - bh - hr * 2 - (d.isRoyal ? 12 : 6) * cam.scale;
+      const barY = torsoTopY - hr * 2 - (d.isRoyal ? 12 : 6) * cam.scale;
       const pct = d.hp / d.maxHp;
 
       ctx.fillStyle = '#333';
@@ -278,12 +591,12 @@ export class Renderer {
   drawDeadEntity(d) {
     const ctx = this.ctx;
     const cam = this.camera;
-    const pos = cam.worldToScreen(d.x, d.y, false);
+    const pos = cam.worldToScreen(d.x, d.y, d.isOnWall);
     const color = d.team === TEAM_BLUE ? BLUE_COLOR : RED_COLOR;
     const bw = BODY_WIDTH * cam.scale;
     const bh = BODY_HEIGHT * cam.scale;
 
-    // Fallen body (rotated 90 degrees)
+    // Fallen body (simple, but readable)
     ctx.save();
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = color;
@@ -292,30 +605,58 @@ export class Renderer {
   }
 
   drawProjectile(p) {
-    // p: [id, type, team, x, y, ownerId]
+    // p: [id, type, team, x, y, ownerId, dist]
     const ctx = this.ctx;
     const cam = this.camera;
     const pos = cam.worldToScreen(p[3], p[4], false);
 
-    // Slight upward offset for visual arc feel
-    const arcOffset = -20 * cam.scale;
+    const dist = p[6] || 0;
+    const maxRange = p[1] === PROJ_ARROW ? ARROW_RANGE : ROCK_RANGE;
+    const progress = maxRange > 0 ? Math.max(0, Math.min(1, dist / maxRange)) : 0;
+    const maxArc = (p[1] === PROJ_ARROW ? 35 : 55) * cam.scale;
+    const arc = Math.sin(progress * Math.PI) * maxArc;
 
     if (p[1] === PROJ_ARROW) {
-      ctx.fillStyle = '#8B4513';
+      const dir = p[2] === TEAM_BLUE ? 1 : -1;
+      const y = pos.y - arc;
       ctx.save();
-      ctx.translate(pos.x, pos.y + arcOffset);
+      ctx.translate(pos.x, y);
+
+      // Shaft
+      ctx.strokeStyle = '#6b3f1e';
+      ctx.lineWidth = 2.2 * cam.scale;
       ctx.beginPath();
-      ctx.moveTo(-6 * cam.scale, 0);
-      ctx.lineTo(6 * cam.scale, 0);
-      ctx.lineTo(0, -3 * cam.scale);
+      ctx.moveTo(-10 * cam.scale * dir, 0);
+      ctx.lineTo(10 * cam.scale * dir, 0);
+      ctx.stroke();
+
+      // Head
+      ctx.fillStyle = '#d8d8d8';
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(10 * cam.scale * dir, 0);
+      ctx.lineTo(4 * cam.scale * dir, -4 * cam.scale);
+      ctx.lineTo(4 * cam.scale * dir, 4 * cam.scale);
       ctx.closePath();
       ctx.fill();
+
+      // Fletching
+      ctx.strokeStyle = '#eeeeee';
+      ctx.lineWidth = 1.5 * cam.scale;
+      ctx.beginPath();
+      ctx.moveTo(-10 * cam.scale * dir, 0);
+      ctx.lineTo(-14 * cam.scale * dir, -3 * cam.scale);
+      ctx.moveTo(-10 * cam.scale * dir, 0);
+      ctx.lineTo(-14 * cam.scale * dir, 3 * cam.scale);
+      ctx.stroke();
+
       ctx.restore();
     } else {
       // Rock
+      const y = pos.y - arc;
       ctx.fillStyle = '#777';
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y + arcOffset, 4 * cam.scale, 0, Math.PI * 2);
+      ctx.arc(pos.x, y, 5 * cam.scale, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#555';
       ctx.stroke();

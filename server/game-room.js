@@ -2,6 +2,8 @@ import Simulation from './simulation.js';
 import GameLoop from './game-loop.js';
 import {
   TYPE_SWORD,
+  TEAM_BLUE,
+  TEAM_RED,
   PHASE_VICTORY,
   COUNTDOWN_SECONDS,
   SHOUT_COOLDOWN_MS,
@@ -80,16 +82,19 @@ class GameRoom {
 
     switch (msg.t) {
       case MSG_TEAM_SELECT:
+        if (this.gameInProgress) break;
         client.team = msg.team;
         this._broadcastLobbyUpdate();
         break;
 
       case MSG_ROLE_SELECT:
+        if (this.gameInProgress) break;
         client.role = msg.role;
         this._broadcastLobbyUpdate();
         break;
 
       case MSG_READY:
+        if (this.gameInProgress) break;
         client.ready = true;
         console.log(`Player ${socketId} ready (team=${client.team}, role=${client.role})`);
         this._broadcastLobbyUpdate();
@@ -156,6 +161,7 @@ class GameRoom {
   }
 
   _startGame() {
+    if (this.gameInProgress) return;
     this._resolveTeams();
 
     const entries = [...this.clients.entries()];

@@ -11,6 +11,7 @@ export class HUD {
     this.phaseText = '';
     this.phaseTextTimer = 0;
     this.winner = null;
+    this.damageFlashTimer = 0;
   }
 
   render(snapshot, localPlayer, camera) {
@@ -107,6 +108,15 @@ export class HUD {
 
     // Chat bubbles
     this.renderChatBubbles(camera);
+
+    // Damage flash (local player only)
+    if (this.damageFlashTimer > 0) {
+      const a = Math.min(1, this.damageFlashTimer / 250);
+      ctx.save();
+      ctx.fillStyle = `rgba(255, 60, 60, ${0.18 * a})`;
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+    }
   }
 
   renderCountdown(seconds) {
@@ -149,8 +159,8 @@ export class HUD {
     ctx.fillText('Click to play again', w / 2, h / 2 + 30);
   }
 
-  addChatBubble(id, text, x, y) {
-    this.chatBubbles.push({ id, text, x, y, timer: 3000 });
+  addChatBubble(id, text, x, y, isOnWall = false) {
+    this.chatBubbles.push({ id, text, x, y, isOnWall: !!isOnWall, timer: 3000 });
   }
 
   renderChatBubbles(camera) {
@@ -158,7 +168,7 @@ export class HUD {
     for (let i = this.chatBubbles.length - 1; i >= 0; i--) {
       const b = this.chatBubbles[i];
       if (!camera) continue;
-      const pos = camera.worldToScreen(b.x, b.y);
+      const pos = camera.worldToScreen(b.x, b.y, b.isOnWall);
       const alpha = Math.min(1, b.timer / 500);
 
       ctx.save();
@@ -212,10 +222,19 @@ export class HUD {
     if (this.phaseTextTimer > 0) {
       this.phaseTextTimer -= dt / 1000;
     }
+
+    if (this.damageFlashTimer > 0) {
+      this.damageFlashTimer -= dt;
+      if (this.damageFlashTimer < 0) this.damageFlashTimer = 0;
+    }
   }
 
   showPhaseText(text) {
     this.phaseText = text;
     this.phaseTextTimer = 2;
+  }
+
+  flashDamage() {
+    this.damageFlashTimer = 250;
   }
 }

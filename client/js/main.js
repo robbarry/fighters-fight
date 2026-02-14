@@ -52,7 +52,7 @@ network.on(MT.MSG_INIT, (data) => {
 });
 
 network.on(MT.MSG_SNAPSHOT, (snap) => {
-  game.interpolation.push(snap);
+  game.onSnapshot(snap);
 });
 
 network.on(MT.MSG_EVENT, (evt) => {

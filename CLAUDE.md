@@ -44,10 +44,10 @@ npm start
 ## Snapshot Format
 
 All enums are small ints. Entity arrays are compact:
-- soldiers: `[id, type, team, x, y, hp, state, facing]`
-- players: `[id, role, team, x, y, hp, state, facing, lives]`
+- soldiers: `[id, type, team, x, y, hp, state, facing, isOnWall]`
+- players: `[id, role, team, x, y, hp, state, facing, lives, isOnWall]`
 - royals: `[id, isKing, team, x, y, hp, state, facing]`
-- projectiles: `[id, type, team, x, y, ownerId]`
+- projectiles: `[id, type, team, x, y, ownerId, dist]`
 
 ## Game Phases
 

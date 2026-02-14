@@ -41,6 +41,7 @@ class Entity {
       Math.round(this.hp),
       this.state,
       this.facing,
+      this.isOnWall ? 1 : 0,
     ];
   }
 }

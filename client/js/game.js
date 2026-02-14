@@ -1,6 +1,7 @@
 import { PHASE_COUNTDOWN, PHASE_VICTORY, PHASE_ARMY_MARCH, PHASE_OPEN_BATTLE,
-         PHASE_CASTLE_ASSAULT, PHASE_FINAL_STAND,
-         STATE_SPECTATING, STATE_DEAD, TEAM_BLUE, TEAM_RED } from '/shared/constants.js';
+	         PHASE_CASTLE_ASSAULT, PHASE_FINAL_STAND,
+	         STATE_SPECTATING, STATE_DEAD, TEAM_BLUE, TEAM_RED,
+	         TYPE_GUNNER } from '/shared/constants.js';
 import * as MT from '/shared/message-types.js';
 import { Renderer } from './renderer.js';
 import { Camera } from './camera.js';
@@ -37,7 +38,36 @@ export class Game {
     this.spectateIndex = 0;
     this.winner = null;
 
+    this._entityIndex = new Map(); // id -> { type, isOnWall }
+
     this._boundLoop = this._loop.bind(this);
+  }
+
+  onSnapshot(snap) {
+    this.interpolation.push(snap);
+    this._indexSnapshot(snap);
+  }
+
+  _indexSnapshot(snap) {
+    this._entityIndex.clear();
+
+    if (snap.soldiers) {
+      for (const s of snap.soldiers) {
+        this._entityIndex.set(s[0], { type: s[1], isOnWall: !!s[8] });
+      }
+    }
+
+    if (snap.players) {
+      for (const p of snap.players) {
+        this._entityIndex.set(p[0], { type: p[1], isOnWall: !!p[9] });
+      }
+    }
+
+    if (snap.royals) {
+      for (const r of snap.royals) {
+        this._entityIndex.set(r[0], { type: null, isOnWall: false });
+      }
+    }
   }
 
   start(playerId) {
@@ -85,6 +115,9 @@ export class Game {
 
     // Update particles
     this.particles.update(dt);
+
+    // Update renderer FX (hit flashes, tracers)
+    this.renderer.update(dt);
 
     // Update HUD
     this.hud.update(dt);
@@ -141,11 +174,34 @@ export class Game {
 
   handleEvent(evt) {
     switch (evt.e) {
-      case MT.EVT_HIT:
-        this.particles.emit('hit_spark', evt.x, evt.y, 6);
+      case MT.EVT_HIT: {
+        const victim = evt.victimId != null ? this._entityIndex.get(evt.victimId) : null;
+        const attacker = evt.attackerId != null ? this._entityIndex.get(evt.attackerId) : null;
+
+        this.particles.emit('hit_spark', evt.x, evt.y, 6, { isOnWall: !!victim?.isOnWall });
+
+        if (evt.victimId != null) {
+          this.renderer.flashHit(evt.victimId);
+        }
+
+        // Make hitscan kills readable even when you aren't the victim.
+        if (attacker && attacker.type === TYPE_GUNNER && evt.victimId != null) {
+          this.renderer.addTracer(evt.attackerId, evt.victimId);
+        }
+
+        if (evt.victimId === this.localPlayerId) {
+          // Make it obvious why you took damage (especially for hitscan).
+          this.hud.flashDamage();
+          if (evt.attackerId != null) {
+            this.renderer.addTracer(evt.attackerId, evt.victimId);
+          }
+        }
         break;
+      }
       case MT.EVT_DEATH:
-        this.particles.emit('death', evt.x, evt.y, 12);
+        this.particles.emit('death', evt.x, evt.y, 12, {
+          isOnWall: !!this._entityIndex.get(evt.id)?.isOnWall,
+        });
         break;
       case MT.EVT_GATE_BREAK:
         this.particles.emit('gate_break', evt.x || 3000, evt.y || 30, 30);
@@ -158,7 +214,13 @@ export class Game {
       case MT.EVT_SHOUT:
       case MT.EVT_CALLOUT: {
         const text = SHOUT_TEXTS[evt.s ?? evt.msg] || '!';
-        this.hud.addChatBubble(evt.id, text, evt.x || 0, evt.y || 0);
+        this.hud.addChatBubble(
+          evt.id,
+          text,
+          evt.x || 0,
+          evt.y || 0,
+          !!this._entityIndex.get(evt.id)?.isOnWall,
+        );
         break;
       }
       case MT.EVT_GAMEOVER:
@@ -186,5 +248,6 @@ export class Game {
     this.winner = null;
     this.countdownSeconds = 0;
     this.spectateIndex = 0;
+    this._entityIndex.clear();
   }
 }
