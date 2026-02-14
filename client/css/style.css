@@ -1,0 +1,64 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: white; font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+
+#game { display: none; width: 100vw; height: 100vh; }
+
+#lobby {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 100vh; padding: 20px;
+}
+
+#lobby-title {
+  font-size: 3em; font-weight: 900; text-align: center; margin-bottom: 30px;
+  text-shadow: 3px 3px 0 #000;
+}
+
+#team-select {
+  display: flex; gap: 20px; margin-bottom: 30px;
+}
+
+.team-btn {
+  padding: 20px 40px; font-size: 1.5em; font-weight: bold; border: 4px solid transparent;
+  border-radius: 12px; cursor: pointer; transition: transform 0.1s, border-color 0.2s;
+  color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+.team-btn:hover { transform: scale(1.05); }
+.team-btn.selected { border-color: white; transform: scale(1.1); }
+.team-btn.blue { background: #4488ff; }
+.team-btn.red { background: #ff4444; }
+.team-btn.random { background: #8844ff; }
+
+#role-select {
+  display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin-bottom: 30px;
+  max-width: 900px;
+}
+
+.role-card {
+  width: 150px; padding: 15px; border: 3px solid #333; border-radius: 10px;
+  background: #16213e; cursor: pointer; text-align: center; transition: all 0.2s;
+}
+.role-card:hover { border-color: #666; background: #1a2744; }
+.role-card.selected { border-color: #ffdd44; background: #1a2744; }
+.role-card .role-icon { font-size: 2.5em; margin-bottom: 8px; }
+.role-card .role-name { font-size: 1.1em; font-weight: bold; margin-bottom: 5px; }
+.role-card .role-desc { font-size: 0.75em; color: #aaa; line-height: 1.3; }
+
+#lobby-status {
+  text-align: center;
+}
+
+.ready-btn {
+  padding: 15px 60px; font-size: 1.5em; font-weight: bold; border: none;
+  border-radius: 10px; cursor: pointer; background: #44bb44; color: white;
+  transition: all 0.2s; margin-bottom: 15px;
+}
+.ready-btn:hover { background: #55cc55; transform: scale(1.05); }
+.ready-btn:disabled { background: #555; cursor: not-allowed; transform: none; }
+.ready-btn.is-ready { background: #888; }
+
+.status-text { font-size: 1em; color: #aaa; margin-top: 10px; }
+
+.other-player-info {
+  margin-top: 15px; padding: 10px 20px; background: #16213e;
+  border-radius: 8px; font-size: 0.9em; color: #aaa;
+}
