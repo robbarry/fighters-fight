@@ -1,5 +1,5 @@
 import * as MT from '/shared/message-types.js';
-import { SHOUT_HELP, SHOUT_LETSGO, SHOUT_HI } from '/shared/message-types.js';
+import { KEYBINDS, SHOUT_BINDINGS } from './controls.js';
 
 export class Input {
   constructor(canvas) {
@@ -13,11 +13,18 @@ export class Input {
     this.pendingShout = null;
 
     window.addEventListener('keydown', (e) => {
+      if (document.body.classList.contains('help-open')) return;
+
       this.keys.add(e.code);
-      if (e.code === 'KeyK') this.pendingShout = SHOUT_HELP;
-      if (e.code === 'KeyL') this.pendingShout = SHOUT_LETSGO;
-      if (e.code === 'KeyR') this.pendingShout = SHOUT_HI;
-      if (e.code === 'Tab') {
+
+      for (const b of SHOUT_BINDINGS) {
+        if (b.codes.includes(e.code)) {
+          this.pendingShout = b.shout;
+          break;
+        }
+      }
+
+      if (KEYBINDS.spectateNext.includes(e.code)) {
         e.preventDefault();
         this.tabPressed = true;
       }
@@ -34,21 +41,41 @@ export class Input {
     });
   }
 
+  clearKeys() {
+    this.keys.clear();
+    this.tabPressed = false;
+    this.pendingShout = null;
+  }
+
+  _uiBlocked() {
+    return document.body.classList.contains('help-open');
+  }
+
+  _hasAny(codes) {
+    for (const code of codes) {
+      if (this.keys.has(code)) return true;
+    }
+    return false;
+  }
+
   getMovement() {
+    if (this._uiBlocked()) return { dx: 0, dy: 0 };
     let dx = 0, dy = 0;
-    if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) dx -= 1;
-    if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) dx += 1;
-    if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) dy -= 1;
-    if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) dy += 1;
+    if (this._hasAny(KEYBINDS.moveLeft)) dx -= 1;
+    if (this._hasAny(KEYBINDS.moveRight)) dx += 1;
+    if (this._hasAny(KEYBINDS.moveUp)) dy -= 1;
+    if (this._hasAny(KEYBINDS.moveDown)) dy += 1;
     return { dx, dy };
   }
 
   isAttacking() {
-    return this.keys.has('Space');
+    if (this._uiBlocked()) return false;
+    return this._hasAny(KEYBINDS.attack);
   }
 
   isBlocking() {
-    return this.keys.has('KeyQ');
+    if (this._uiBlocked()) return false;
+    return this._hasAny(KEYBINDS.block);
   }
 
   consumeShout() {

@@ -3,9 +3,14 @@ import { PHASE_VICTORY } from '/shared/constants.js';
 import { Network } from './network.js';
 import { Game } from './game.js';
 import { Lobby } from './lobby.js';
+import { HelpOverlay } from './help.js';
 
 const canvas = document.getElementById('game');
 const lobbyDiv = document.getElementById('lobby');
+const helpBtn = document.getElementById('help-btn');
+const helpOverlayEl = document.getElementById('help-overlay');
+const helpCloseBtn = document.getElementById('help-close');
+const helpContentEl = document.getElementById('help-content');
 
 // Resize canvas to fill window
 function resize() {
@@ -16,6 +21,33 @@ function resize() {
 const network = new Network();
 const lobby = new Lobby(lobbyDiv);
 const game = new Game(canvas, network);
+const help = new HelpOverlay(helpOverlayEl, helpContentEl);
+
+function toggleHelp() {
+  help.toggle();
+  if (help.isOpen()) game.input.clearKeys();
+}
+
+helpBtn.addEventListener('click', () => toggleHelp());
+helpCloseBtn.addEventListener('click', () => help.close());
+helpOverlayEl.addEventListener('click', (e) => {
+  if (e.target === helpOverlayEl) help.close();
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+
+  if (e.key === '?' || (e.code === 'Slash' && e.shiftKey)) {
+    e.preventDefault();
+    toggleHelp();
+    return;
+  }
+
+  if (e.key === 'Escape' && help.isOpen()) {
+    e.preventDefault();
+    help.close();
+  }
+});
 
 window.addEventListener('resize', resize);
 resize();

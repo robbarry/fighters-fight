@@ -13,6 +13,19 @@
     <div id="role-select"></div>
     <div id="lobby-status"></div>
   </div>
+
+  <button id="help-btn" type="button" aria-label="Help">?</button>
+  <div id="help-overlay" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="help-modal" role="document">
+      <div class="help-header">
+        <div id="help-title">Controls</div>
+        <button id="help-close" type="button" aria-label="Close help">X</button>
+      </div>
+      <div id="help-content"></div>
+      <div class="help-footer">Press ? to toggle. Esc to close.</div>
+    </div>
+  </div>
+
   <canvas id="game"></canvas>
   <script type="module" src="js/main.js"></script>
 </body>
