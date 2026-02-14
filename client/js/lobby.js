@@ -1,19 +1,7 @@
 import { TYPE_SWORD, TYPE_SPEAR, TYPE_ARCHER, TYPE_GUNNER, TYPE_CATAPULT,
          TEAM_BLUE, TEAM_RED } from '/shared/constants.js';
 import * as MT from '/shared/message-types.js';
-
-const ROLES = [
-  { type: TYPE_SWORD, name: 'Sword & Shield', icon: '\u2694\uFE0F',
-    desc: 'Front line fighter! Swing your sword and block with your shield!' },
-  { type: TYPE_SPEAR, name: 'Spear', icon: '\uD83D\uDD31',
-    desc: 'Longer reach! Stab enemies from further away!' },
-  { type: TYPE_ARCHER, name: 'Archer', icon: '\uD83C\uDFF9',
-    desc: 'Rain arrows from the castle walls!' },
-  { type: TYPE_GUNNER, name: 'Gunner', icon: '\uD83D\uDD2B',
-    desc: 'Powerful shots from the walls! Yells FIRING!' },
-  { type: TYPE_CATAPULT, name: 'Catapult', icon: '\uD83E\uDEA8',
-    desc: 'Launch boulders! Hold Space to power up!' },
-];
+import { ROLES } from './roles.js';
 
 export class Lobby {
   constructor(container) {
@@ -44,7 +32,7 @@ export class Lobby {
       // Insert after title, before team-select
       c.insertBefore(subtitle, c.querySelector('#team-select'));
     }
-    subtitle.textContent = 'Pick your team and role!';
+    subtitle.textContent = 'Pick your team and role. Press ? for controls.';
 
     // Team select
     const teamSelect = c.querySelector('#team-select');

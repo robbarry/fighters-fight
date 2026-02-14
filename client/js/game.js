@@ -1,7 +1,7 @@
 import { PHASE_COUNTDOWN, PHASE_VICTORY, PHASE_ARMY_MARCH, PHASE_OPEN_BATTLE,
 	         PHASE_CASTLE_ASSAULT, PHASE_FINAL_STAND,
 	         STATE_SPECTATING, STATE_DEAD, TEAM_BLUE, TEAM_RED,
-	         TYPE_GUNNER } from '/shared/constants.js';
+	         TYPE_GUNNER, TYPE_CATAPULT, CATAPULT_CHARGE_MS } from '/shared/constants.js';
 import * as MT from '/shared/message-types.js';
 import { Renderer } from './renderer.js';
 import { Camera } from './camera.js';
@@ -9,6 +9,7 @@ import { Input } from './input.js';
 import { Interpolation } from './interpolation.js';
 import { HUD } from './hud.js';
 import { ParticleSystem } from './particles.js';
+import { roleName } from './roles.js';
 
 const SHOUT_TEXTS = ['I need help!', "Let's go!", 'Hi!', 'FIRING!', 'Throwing spears!'];
 const PHASE_ANNOUNCE = {
@@ -38,7 +39,11 @@ export class Game {
     this.spectateIndex = 0;
     this.winner = null;
 
-    this._entityIndex = new Map(); // id -> { type, isOnWall }
+    this._entityIndex = new Map(); // id -> { kind, type, isOnWall, isKing }
+    this._localRole = null;
+    this._localChargeMs = 0;
+    this._lastDamageFrom = null;
+    this._lastDamageAt = 0;
 
     this._boundLoop = this._loop.bind(this);
   }
@@ -53,20 +58,26 @@ export class Game {
 
     if (snap.soldiers) {
       for (const s of snap.soldiers) {
-        this._entityIndex.set(s[0], { type: s[1], isOnWall: !!s[8] });
+        this._entityIndex.set(s[0], { kind: 'soldier', type: s[1], isOnWall: !!s[8] });
       }
     }
 
     if (snap.players) {
       for (const p of snap.players) {
-        this._entityIndex.set(p[0], { type: p[1], isOnWall: !!p[9] });
+        this._entityIndex.set(p[0], { kind: 'player', type: p[1], isOnWall: !!p[9] });
       }
     }
 
     if (snap.royals) {
       for (const r of snap.royals) {
-        this._entityIndex.set(r[0], { type: null, isOnWall: false });
+        this._entityIndex.set(r[0], { kind: 'royal', type: null, isOnWall: false, isKing: !!r[1] });
       }
+    }
+
+    // Cache local role for UI (charge meter, aim assist, etc.)
+    if (this.localPlayerId != null && snap.players) {
+      const lp = snap.players.find(p => p[0] === this.localPlayerId);
+      if (lp) this._localRole = lp[1];
     }
   }
 
@@ -75,6 +86,7 @@ export class Game {
     this.running = true;
     this.canvas.style.display = 'block';
     this.lastFrameTime = performance.now();
+    this.hud.showToast('Press ? for controls', 2400);
     requestAnimationFrame(this._boundLoop);
   }
 
@@ -84,20 +96,25 @@ export class Game {
     const dt = timestamp - this.lastFrameTime;
     this.lastFrameTime = timestamp;
 
+    const snap = this.interpolation.getInterpolated();
+    const localPlayer = this._getLocalPlayer(snap);
+
+    this._updateCamera(snap, localPlayer);
     this._update(dt, timestamp);
-    this._render();
+    this._render(snap, localPlayer);
 
     requestAnimationFrame(this._boundLoop);
   }
 
   _update(dt, now) {
+    // Update mouse world coordinates every frame (for responsive aiming).
+    const worldMouse = this.camera.screenToWorld(this.input.mouseX, this.input.mouseY);
+    this.input.mouseWorldX = worldMouse.x;
+    this.input.mouseWorldY = worldMouse.y;
+    this.hud.setAim(this.input.mouseX, this.input.mouseY, worldMouse.x, worldMouse.y);
+
     // Send input at ~20Hz
     if (now - this.lastInputSend > 50) {
-      // Update mouse world coordinates
-      const worldMouse = this.camera.screenToWorld(this.input.mouseX, this.input.mouseY);
-      this.input.mouseWorldX = worldMouse.x;
-      this.input.mouseWorldY = worldMouse.y;
-
       this.network.send(this.input.toInputMessage());
       this.lastInputSend = now;
 
@@ -122,23 +139,28 @@ export class Game {
     // Update HUD
     this.hud.update(dt);
 
+    // Catapult charge meter (client-side estimate)
+    if (this._localRole === TYPE_CATAPULT && this.input.isAttacking()) {
+      this._localChargeMs = Math.min(CATAPULT_CHARGE_MS, this._localChargeMs + dt);
+    } else {
+      this._localChargeMs = 0;
+    }
+    this.hud.setChargeMs(this._localChargeMs);
+
     // Countdown
     if (this.countdownSeconds > 0) {
       this.countdownSeconds -= dt / 1000;
     }
   }
 
-  _render() {
-    const snap = this.interpolation.getInterpolated();
+  _getLocalPlayer(snap) {
     if (!snap) return;
+    if (!snap.players) return null;
+    return snap.players.find(p => p[0] === this.localPlayerId) || null;
+  }
 
-    // Find local player
-    let localPlayer = null;
-    if (snap.players) {
-      localPlayer = snap.players.find(p => p[0] === this.localPlayerId);
-    }
-
-    // Determine camera follow target
+  _updateCamera(snap, localPlayer) {
+    if (!snap) return;
     let followX = 3000; // default world center
     if (localPlayer) {
       if (localPlayer[6] === STATE_SPECTATING && snap.soldiers) {
@@ -155,6 +177,10 @@ export class Game {
     }
 
     this.camera.follow(followX);
+  }
+
+  _render(snap, localPlayer) {
+    if (!snap) return;
 
     // Draw everything
     this.renderer.render(snap, this.localPlayerId);
@@ -190,8 +216,16 @@ export class Game {
         }
 
         if (evt.victimId === this.localPlayerId) {
+          this._lastDamageFrom = attacker || null;
+          this._lastDamageAt = performance.now();
+
           // Make it obvious why you took damage (especially for hitscan).
           this.hud.flashDamage();
+          const who = attacker
+            ? attacker.kind === 'royal' ? (attacker.isKing ? 'King' : 'Queen') : roleName(attacker.type)
+            : 'Unknown';
+          const dmg = evt.dmg != null ? Math.round(evt.dmg) : 0;
+          this.hud.showToast(`Hit by ${who} (-${dmg})`, 1200);
           if (evt.attackerId != null) {
             this.renderer.addTracer(evt.attackerId, evt.victimId);
           }
@@ -202,9 +236,19 @@ export class Game {
         this.particles.emit('death', evt.x, evt.y, 12, {
           isOnWall: !!this._entityIndex.get(evt.id)?.isOnWall,
         });
+        if (evt.id === this.localPlayerId) {
+          const now = performance.now();
+          const killer = (this._lastDamageFrom && (now - this._lastDamageAt) < 2000)
+            ? (this._lastDamageFrom.kind === 'royal'
+              ? (this._lastDamageFrom.isKing ? 'King' : 'Queen')
+              : roleName(this._lastDamageFrom.type))
+            : null;
+          this.hud.showToast(killer ? `Killed by ${killer}` : 'You died', 1600);
+        }
         break;
       case MT.EVT_GATE_BREAK:
         this.particles.emit('gate_break', evt.x || 3000, evt.y || 30, 30);
+        this.hud.showToast('Gate broken! Push in!', 2200);
         break;
       case MT.EVT_PHASE: {
         const text = PHASE_ANNOUNCE[evt.phase];
@@ -249,5 +293,9 @@ export class Game {
     this.countdownSeconds = 0;
     this.spectateIndex = 0;
     this._entityIndex.clear();
+    this._localRole = null;
+    this._localChargeMs = 0;
+    this._lastDamageFrom = null;
+    this._lastDamageAt = 0;
   }
 }

@@ -80,6 +80,10 @@ class Player extends Entity {
     this.attackCooldownBase = cooldownForRole(role);
     this.damage = damageForRole(role);
     this.attackRange = rangeForRole(role);
+
+    // Catapult: hold-to-charge, release-to-fire.
+    this.chargeMs = 0;
+    this._prevAtk = false;
   }
 
   applyInput(msg) {
@@ -107,6 +111,8 @@ class Player extends Entity {
     this.y = y;
     this.state = STATE_IDLE;
     this.respawnTimer = 0;
+    this.chargeMs = 0;
+    this._prevAtk = false;
   }
 
   serialize() {

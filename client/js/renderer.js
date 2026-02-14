@@ -512,17 +512,19 @@ export class Renderer {
       // Shield (sword+shield only, and big/obvious when blocking)
       if (weaponType === TYPE_SWORD) {
         const shieldX = feetX - weaponDir * torsoW * 0.65;
-        const shieldY = torsoY + torsoH * 0.55;
-        const sw = 10 * cam.scale * scale;
-        const sh = 14 * cam.scale * scale;
+        const blocking = d.state === STATE_BLOCK;
+        const shieldY = torsoY + torsoH * (blocking ? 0.48 : 0.55);
+        const shieldScale = blocking ? 1.18 : 1;
+        const sw = 10 * cam.scale * scale * shieldScale;
+        const sh = 14 * cam.scale * scale * shieldScale;
         const showShield = d.state === STATE_BLOCK || d.isPlayer || d.isRoyal;
 
         if (showShield) {
           roundRectPath(ctx, shieldX - sw / 2, shieldY - sh / 2, sw, sh, 4 * cam.scale * scale);
-          ctx.fillStyle = '#7a5a3a';
+          ctx.fillStyle = blocking ? '#8b6a45' : '#7a5a3a';
           ctx.fill();
-          ctx.strokeStyle = '#3b2a1a';
-          ctx.lineWidth = 2 * cam.scale * scale;
+          ctx.strokeStyle = blocking ? 'rgba(255, 221, 68, 0.85)' : '#3b2a1a';
+          ctx.lineWidth = (blocking ? 2.6 : 2) * cam.scale * scale;
           ctx.stroke();
           ctx.fillStyle = '#d1b07a';
           ctx.beginPath();
@@ -583,6 +585,26 @@ export class Renderer {
       ctx.fillRect(barX, barY, barW, barH);
       ctx.fillStyle = pct > 0.5 ? '#44cc44' : pct > 0.25 ? '#cccc44' : '#cc4444';
       ctx.fillRect(barX, barY, barW * pct, barH);
+    }
+
+    // Local player marker
+    if (d.isLocal) {
+      const t = performance.now() / 1000;
+      const bounce = Math.sin(t * 5) * 2 * cam.scale;
+      const my = torsoTopY - hr * 2.1 - 16 * cam.scale + bounce;
+      ctx.save();
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = '#ffdd44';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.lineWidth = 2 * cam.scale;
+      ctx.beginPath();
+      ctx.moveTo(feetX, my);
+      ctx.lineTo(feetX - 7 * cam.scale, my - 11 * cam.scale);
+      ctx.lineTo(feetX + 7 * cam.scale, my - 11 * cam.scale);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
     }
 
     ctx.restore();

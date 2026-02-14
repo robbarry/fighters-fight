@@ -41,6 +41,9 @@ import {
   ARROW_SPEED,
   ROCK_SPEED,
   ATTACK_TIMING_VARIANCE,
+  CATAPULT_CHARGE_MS,
+  CATAPULT_CHARGE_SPEED_MAX_MULT,
+  CATAPULT_CHARGE_DAMAGE_MAX_MULT,
   CASTLE_WIDTH,
   BLUE_CASTLE_X,
   RED_CASTLE_X,
@@ -346,9 +349,10 @@ class Simulation {
       if (player.isDead) continue;
 
       // Reduce cooldowns
-      player.attackCooldownTimer -= dt * 1000;
+      const dtMs = dt * 1000;
+      player.attackCooldownTimer -= dtMs;
       if (player.attackCooldownTimer < 0) player.attackCooldownTimer = 0;
-      player.shoutCooldown -= dt * 1000;
+      player.shoutCooldown -= dtMs;
       if (player.shoutCooldown < 0) player.shoutCooldown = 0;
 
       // Movement
@@ -379,7 +383,53 @@ class Simulation {
       }
 
       // Attack
-      if (atk && player.attackCooldownTimer <= 0) {
+      if (player.role === TYPE_CATAPULT) {
+        const ready = player.attackCooldownTimer <= 0;
+
+        if (!ready) {
+          player.chargeMs = 0;
+        } else if (atk) {
+          player.chargeMs += dtMs;
+          if (player.chargeMs > CATAPULT_CHARGE_MS) player.chargeMs = CATAPULT_CHARGE_MS;
+        }
+
+        const released = player._prevAtk && !atk;
+        if (ready && released) {
+          const chargePct = CATAPULT_CHARGE_MS > 0
+            ? Math.max(0, Math.min(1, player.chargeMs / CATAPULT_CHARGE_MS))
+            : 0;
+          const speedMult = 1 + (CATAPULT_CHARGE_SPEED_MAX_MULT - 1) * chargePct;
+          const damageMult = 1 + (CATAPULT_CHARGE_DAMAGE_MAX_MULT - 1) * chargePct;
+
+          const adx = aimX - player.x;
+          const ady = aimY - player.y;
+          const alen = Math.sqrt(adx * adx + ady * ady);
+          const speed = ROCK_SPEED * speedMult;
+          const vx = alen > 0 ? (adx / alen) * speed : speed;
+          const vy = alen > 0 ? (ady / alen) * speed : 0;
+
+          const proj = new Projectile(
+            this.genId(), PROJ_ROCK, player.team,
+            player.x, player.y, vx, vy, player.id
+          );
+          proj.damage = Math.round(proj.damage * damageMult);
+          this.projectiles.push(proj);
+          this.events.push({
+            tick: this.tick,
+            e: EVT_FIRE,
+            id: player.id,
+            type: PROJ_ROCK,
+            x: Math.round(player.x),
+            y: Math.round(player.y),
+          });
+
+          const variance = 1 + (Math.random() * 2 - 1) * ATTACK_TIMING_VARIANCE;
+          player.attackCooldownTimer = player.attackCooldownBase * variance;
+          player.chargeMs = 0;
+        }
+
+        player._prevAtk = atk;
+      } else if (atk && player.attackCooldownTimer <= 0) {
         const variance = 1 + (Math.random() * 2 - 1) * ATTACK_TIMING_VARIANCE;
         player.attackCooldownTimer = player.attackCooldownBase * variance;
 
@@ -456,26 +506,6 @@ class Simulation {
               this._handleEntityDeath(hit);
             }
           }
-        } else if (player.role === TYPE_CATAPULT) {
-          // Create rock projectile toward aim point
-          const adx = aimX - player.x;
-          const ady = aimY - player.y;
-          const alen = Math.sqrt(adx * adx + ady * ady);
-          const vx = alen > 0 ? (adx / alen) * ROCK_SPEED : ROCK_SPEED;
-          const vy = alen > 0 ? (ady / alen) * ROCK_SPEED : 0;
-          const proj = new Projectile(
-            this.genId(), PROJ_ROCK, player.team,
-            player.x, player.y, vx, vy, player.id
-          );
-          this.projectiles.push(proj);
-          this.events.push({
-            tick: this.tick,
-            e: EVT_FIRE,
-            id: player.id,
-            type: PROJ_ROCK,
-            x: Math.round(player.x),
-            y: Math.round(player.y),
-          });
         }
       }
     }

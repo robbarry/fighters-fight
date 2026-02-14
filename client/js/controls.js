@@ -59,7 +59,7 @@ export const HELP_SECTIONS = [
     rows: [
       {
         combos: [KEYBINDS.attack],
-        text: 'Attack / fire (hold).',
+        text: 'Attack / fire. Hold Space to keep attacking. Catapult: hold to charge, release to fire.',
       },
       {
         combos: [KEYBINDS.block],
@@ -108,4 +108,3 @@ export const HELP_SECTIONS = [
     ],
   },
 ];
-

@@ -114,6 +114,9 @@ export const ROCK_RANGE = 1200;
 export const ROCK_SPEED = 250;
 export const ROCK_COOLDOWN = 3000;
 export const ROCK_AOE_RADIUS = 60;
+export const CATAPULT_CHARGE_MS = 1000;
+export const CATAPULT_CHARGE_SPEED_MAX_MULT = 1.7;
+export const CATAPULT_CHARGE_DAMAGE_MAX_MULT = 1.35;
 
 // ─── Combat: General ─────────────────────────────────────
 export const MELEE_Y_FORGIVENESS = 20;
