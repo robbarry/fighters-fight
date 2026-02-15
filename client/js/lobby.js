@@ -109,7 +109,7 @@ export class Lobby {
 
     // Debug footer
     this.debugLog = document.createElement('div');
-    this.debugLog.style.cssText = 'position:fixed; bottom:5px; right:5px; font-size:10px; color:#666; font-family:monospace; pointer-events:none; text-align:right;';
+    this.debugLog.style.cssText = 'position:fixed; bottom:5px; right:5px; font-size:12px; color:#0f0; font-family:monospace; pointer-events:none; text-align:right; z-index:9999; background:rgba(0,0,0,0.8); padding:4px; border-radius:4px;';
     c.appendChild(this.debugLog);
     this.log('Lobby UI ready');
   }
