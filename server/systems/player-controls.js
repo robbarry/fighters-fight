@@ -34,6 +34,7 @@ import {
   CASTLE_WIDTH,
   WORLD_WIDTH,
   MELEE_Y_FORGIVENESS,
+  GROUND_Y_MAX,
 } from '../../shared/constants.js';
 import {
   EVT_HIT,
@@ -61,7 +62,10 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
   }
 
   // Movement
-  const { dx, dy, atk, blk, spc, aimX, aimY } = player.input;
+  const { dx, dy, atk, blk, spc, aimX, aimY: rawAimY } = player.input;
+  // Clamp aimY to play area to prevent shooting into the void (sky aiming)
+  const aimY = Math.max(0, Math.min(GROUND_Y_MAX, rawAimY));
+
   if (player.isOnWall) {
     // Keep wall roles pinned to the battlements lane.
     player.y = 30;
