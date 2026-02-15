@@ -25,5 +25,7 @@ export function updateProjectiles(projectiles, dt) {
   for (const p of projectiles) {
     p.update(dt);
   }
-  return projectiles.filter(p => !p.isExpired());
+  // Range expiration is handled later (after collision + gate checks) so the
+  // last tick of movement can still register hits.
+  return projectiles;
 }

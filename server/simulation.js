@@ -454,6 +454,19 @@ class Simulation {
       }
     }
 
+    // Expire by range after collision + gate checks so a projectile that
+    // crosses its max range this tick can still register effects.
+    for (const proj of this.projectiles) {
+      if (!proj.alive) continue;
+      if (!Number.isFinite(proj.distanceTraveled) || !Number.isFinite(proj.maxRange)) {
+        proj.alive = false;
+        continue;
+      }
+      if (proj.distanceTraveled > proj.maxRange) {
+        proj.alive = false;
+      }
+    }
+
     // Remove dead projectiles
     this.projectiles = this.projectiles.filter(p => p.alive);
 

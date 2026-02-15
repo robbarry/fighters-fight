@@ -14,6 +14,7 @@ import {
   ARROW_SPEED,
   BULLET_SPEED,
   ROCK_SPEED,
+  ROCK_RANGE,
   ATTACK_TIMING_VARIANCE,
   CATAPULT_CHARGE_MS,
   CATAPULT_CHARGE_SPEED_MAX_MULT,
@@ -193,11 +194,18 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
       const vx = alen > 0 ? (adx / alen) * speed : speed;
       const vy = alen > 0 ? (ady / alen) * speed : 0;
 
+      // Rocks should "land" where you aimed (clamped to weapon range) so the
+      // client-side arc completes instead of disappearing mid-flight.
+      const rockRange = player.attackRange || ROCK_RANGE;
+      const targetDist = alen > 0 ? Math.min(alen, rockRange) : rockRange;
+
       const proj = new Projectile(
         simulation.genId(), PROJ_ROCK, player.team,
         player.x, player.y, vx, vy, player.id,
-        alen
+        targetDist
       );
+      // Treat the landing distance as the rock's max travel distance.
+      proj.maxRange = targetDist;
       proj.damage = Math.round(proj.damage * damageMult);
       simulation.projectiles.push(proj);
       simulation.events.push({
