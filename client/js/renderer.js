@@ -553,12 +553,23 @@ export class Renderer {
   }
 
   drawProjectile(ctx, cam, p) {
-    // p: [id, type, team, x, y, ownerId, dist]
-    const pos = cam.worldToScreen(p[3], p[4], false);
+    // p: [id, type, team, x, y, ownerId, dist, targetDist]
     const type = p[1];
+    const dist = p[6] || 0;
+    const targetDist = p[7] || 1000;
+    
+    let arc = 0;
+    if (type === PROJ_ROCK || type === PROJ_ARROW) {
+        const progress = Math.max(0, Math.min(1, dist / targetDist));
+        // Dynamic height based on shot distance
+        const maxHeight = targetDist * 0.3; 
+        arc = Math.sin(progress * Math.PI) * maxHeight * cam.scale;
+    }
+
+    const pos = cam.worldToScreen(p[3], p[4], false);
     
     ctx.save();
-    ctx.translate(pos.x, pos.y);
+    ctx.translate(pos.x, pos.y - arc);
     ctx.scale(cam.scale, cam.scale);
     
     if (type === PROJ_ARROW) {

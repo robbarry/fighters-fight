@@ -193,7 +193,8 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
 
       const proj = new Projectile(
         simulation.genId(), PROJ_ROCK, player.team,
-        player.x, player.y, vx, vy, player.id
+        player.x, player.y, vx, vy, player.id,
+        alen
       );
       proj.damage = Math.round(proj.damage * damageMult);
       simulation.projectiles.push(proj);
@@ -267,7 +268,8 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
       const vy = alen > 0 ? (ady / alen) * ARROW_SPEED : 0;
       const proj = new Projectile(
         simulation.genId(), PROJ_ARROW, player.team,
-        player.x, player.y, vx, vy, player.id
+        player.x, player.y, vx, vy, player.id,
+        alen
       );
       proj.damage = player.damage;
       simulation.projectiles.push(proj);

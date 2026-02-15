@@ -11,7 +11,7 @@ import {
 } from '../../shared/constants.js';
 
 class Projectile {
-  constructor(id, type, team, x, y, vx, vy, ownerId) {
+  constructor(id, type, team, x, y, vx, vy, ownerId, targetDist = 0) {
     this.id = id;
     this.type = type;
     this.team = team;
@@ -31,6 +31,7 @@ class Projectile {
       type === PROJ_ARROW ? ARROW_RANGE :
       type === PROJ_BULLET ? BULLET_RANGE :
       ROCK_RANGE;
+    this.targetDist = targetDist > 0 ? targetDist : this.maxRange;
     this.alive = true;
   }
 
@@ -57,6 +58,7 @@ class Projectile {
       Math.round(this.y),
       this.ownerId,
       Math.round(this.distanceTraveled),
+      Math.round(this.targetDist),
     ];
   }
 }
