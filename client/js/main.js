@@ -114,5 +114,8 @@ canvas.addEventListener('click', () => {
 });
 
 // Connect
+network.setDisconnectHandler(() => {
+  document.body.innerHTML = '<div style="color:white;text-align:center;padding-top:20%;font-family:sans-serif;"><h1>Disconnected</h1><p>Please refresh the page to reconnect.</p></div>';
+});
 network.connect();
 lobby.show();

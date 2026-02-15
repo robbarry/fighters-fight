@@ -24,11 +24,16 @@ export class Network {
 
     this.ws.onclose = () => {
       this.connected = false;
+      if (this.onDisconnectCallback) this.onDisconnectCallback();
     };
 
     this.ws.onerror = (e) => {
       console.error('WebSocket error', e);
     };
+  }
+
+  setDisconnectHandler(cb) {
+    this.onDisconnectCallback = cb;
   }
 
   send(msg) {
