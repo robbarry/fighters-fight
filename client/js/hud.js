@@ -4,7 +4,7 @@ import { TEAM_BLUE, TEAM_RED, PHASE_LOBBY, PHASE_COUNTDOWN, PHASE_ARMY_MARCH,
          TYPE_ARCHER, TYPE_GUNNER, TYPE_CATAPULT,
          GATE_HP, CASTLE_WIDTH, BLUE_CASTLE_X, RED_CASTLE_X,
          ARROW_RANGE, BULLET_RANGE, ROCK_RANGE,
-         CATAPULT_CHARGE_MS } from '/shared/constants.js';
+         CATAPULT_CHARGE_MS, PLAYER_HP, ROYAL_HP } from '/shared/constants.js';
 import { roleName, roleUsesAim } from './roles.js';
 
 export class HUD {
@@ -21,6 +21,7 @@ export class HUD {
     this.statusToastTimer = 0;
     this.aim = { sx: 0, sy: 0, wx: 0, wy: 0 };
     this.chargeMs = 0;
+    this.damageNumbers = []; // { x,y,isOnWall,amount,critical,ms,total,offX,offY,vy }
   }
 
   setAim(sx, sy, wx, wy) {
@@ -37,6 +38,25 @@ export class HUD {
   showToast(text, ms = 1400) {
     this.statusToast = text;
     this.statusToastTimer = ms;
+  }
+
+  addDamageNumber(amount, x, y, isOnWall = false, critical = false) {
+    if (amount == null) return;
+    const n = Math.round(amount);
+    if (!Number.isFinite(n) || n <= 0) return;
+    const total = critical ? 1100 : 900;
+    this.damageNumbers.push({
+      x: x || 0,
+      y: y || 0,
+      isOnWall: !!isOnWall,
+      amount: n,
+      critical: !!critical,
+      ms: total,
+      total,
+      offX: (Math.random() * 2 - 1) * 10,
+      offY: (Math.random() * 2 - 1) * 4,
+      vy: -(40 + Math.random() * 45), // px/sec
+    });
   }
 
   render(snapshot, localPlayer, camera) {
@@ -93,7 +113,16 @@ export class HUD {
       ctx.fillText(text, w / 2, h * 0.35);
     }
 
+    // Combat text
+    this._renderDamageNumbers(camera);
+
     if (!localPlayer) return;
+
+    const controlsRoyalId = localPlayer[10] || 0;
+    const controlledRoyal = (controlsRoyalId && snapshot.royals)
+      ? (snapshot.royals.find(r => r[0] === controlsRoyalId) || null)
+      : null;
+    const controllingRoyal = !!controlledRoyal;
 
     // You (bottom left)
     const team = localPlayer[2];
@@ -102,25 +131,28 @@ export class HUD {
     ctx.font = 'bold 14px system-ui';
     ctx.textAlign = 'left';
     ctx.fillStyle = team === TEAM_BLUE ? '#a9c8ff' : '#ffb2b2';
-    ctx.fillText(`You: ${teamName} ${roleName(role)}`, 20, h - 22);
+    const youRole = controllingRoyal ? (controlledRoyal[1] ? 'KING' : 'QUEEN') : roleName(role);
+    ctx.fillText(`You: ${teamName} ${youRole}`, 20, h - 22);
 
     // Direction hint for objectives that might be off-screen
     this._renderObjectivePointer(snapshot, localPlayer, camera);
 
     // Player lives (top right)
-    ctx.font = 'bold 18px system-ui';
-    ctx.fillStyle = '#ff6666';
-    ctx.textAlign = 'right';
-    const lives = localPlayer[8];
-    let heartsStr = '';
-    for (let i = 0; i < Math.min(lives, 10); i++) heartsStr += '\u2665 ';
-    ctx.fillText(heartsStr, w - 20, 30);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(`Lives: ${lives}`, w - 20, 55);
+    if (!controllingRoyal) {
+      ctx.font = 'bold 18px system-ui';
+      ctx.fillStyle = '#ff6666';
+      ctx.textAlign = 'right';
+      const lives = localPlayer[8];
+      let heartsStr = '';
+      for (let i = 0; i < Math.min(lives, 10); i++) heartsStr += '\u2665 ';
+      ctx.fillText(heartsStr, w - 20, 30);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`Lives: ${lives}`, w - 20, 55);
+    }
 
     // Player health bar (bottom center)
-    const hp = localPlayer[5];
-    const maxHp = 40;
+    const hp = controllingRoyal ? controlledRoyal[5] : localPlayer[5];
+    const maxHp = controllingRoyal ? ROYAL_HP : PLAYER_HP;
     const barW = 200;
     const barH = 20;
     const barX = w / 2 - barW / 2;
@@ -137,10 +169,13 @@ export class HUD {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 14px system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText(`${Math.ceil(hp)} / ${maxHp}`, w / 2, barY + 15);
+    const hpLabel = controllingRoyal
+      ? `${Math.ceil(hp)} / ${maxHp} (${controlledRoyal[1] ? 'KING' : 'QUEEN'})`
+      : `${Math.ceil(hp)} / ${maxHp}`;
+    ctx.fillText(hpLabel, w / 2, barY + 15);
 
     // Block indicator
-    if (localPlayer[6] === STATE_BLOCK) {
+    if (!controllingRoyal && localPlayer[6] === STATE_BLOCK) {
       ctx.font = 'bold 14px system-ui';
       ctx.fillStyle = '#ffdd44';
       ctx.textAlign = 'center';
@@ -148,7 +183,7 @@ export class HUD {
     }
 
     // Catapult charge meter (client-side estimate, for feel)
-    if (role === TYPE_CATAPULT) {
+    if (!controllingRoyal && role === TYPE_CATAPULT) {
       const pct = CATAPULT_CHARGE_MS > 0 ? Math.max(0, Math.min(1, this.chargeMs / CATAPULT_CHARGE_MS)) : 0;
       const cw = 200;
       const ch = 8;
@@ -170,7 +205,7 @@ export class HUD {
     }
 
     // Aim assist (ranged roles)
-    if (roleUsesAim(role) && !document.body.classList.contains('help-open')) {
+    if (!controllingRoyal && roleUsesAim(role) && !document.body.classList.contains('help-open')) {
       this._renderAimAssist(localPlayer, camera);
     }
 
@@ -190,7 +225,23 @@ export class HUD {
       ctx.font = 'bold 24px system-ui';
       ctx.fillStyle = '#aaa';
       ctx.textAlign = 'center';
-      ctx.fillText('SPECTATING - Press Tab to switch', w / 2, h - 80);
+      if (controllingRoyal) {
+        const label = controlledRoyal[1] ? 'KING' : 'QUEEN';
+        ctx.fillStyle = '#ffdd44';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.lineWidth = 4;
+        ctx.strokeText(`CONTROLLING ${label}`, w / 2, h - 82);
+        ctx.fillText(`CONTROLLING ${label}`, w / 2, h - 82);
+
+        ctx.font = 'bold 14px system-ui';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.80)';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.60)';
+        ctx.lineWidth = 3;
+        ctx.strokeText('WASD/Arrows to move, Space to attack', w / 2, h - 58);
+        ctx.fillText('WASD/Arrows to move, Space to attack', w / 2, h - 58);
+      } else {
+        ctx.fillText('SPECTATING - Press Tab to switch', w / 2, h - 80);
+      }
     }
 
     // Chat bubbles
@@ -333,6 +384,16 @@ export class HUD {
     if (this.statusToastTimer > 0) {
       this.statusToastTimer -= dt;
       if (this.statusToastTimer < 0) this.statusToastTimer = 0;
+    }
+
+    // Damage numbers
+    const dtSec = dt / 1000;
+    for (let i = this.damageNumbers.length - 1; i >= 0; i--) {
+      const dn = this.damageNumbers[i];
+      dn.ms -= dt;
+      dn.offY += dn.vy * dtSec;
+      dn.vy += 110 * dtSec;
+      if (dn.ms <= 0) this.damageNumbers.splice(i, 1);
     }
   }
 
@@ -517,5 +578,29 @@ export class HUD {
     ctx.textAlign = dir < 0 ? 'left' : 'right';
     ctx.fillText(label, dir < 0 ? x + 22 : x - 22, y + 4);
     ctx.restore();
+  }
+
+  _renderDamageNumbers(camera) {
+    if (!camera || this.damageNumbers.length === 0) return;
+    const ctx = this.ctx;
+
+    for (const dn of this.damageNumbers) {
+      const pos = camera.worldToScreen(dn.x, dn.y, dn.isOnWall);
+      const a = Math.max(0, Math.min(1, dn.ms / dn.total));
+      const sx = pos.x + dn.offX;
+      const sy = pos.y - 26 * camera.scale + dn.offY;
+
+      ctx.save();
+      ctx.globalAlpha = 0.95 * a;
+      ctx.font = dn.critical ? '900 18px system-ui' : '900 14px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = dn.critical ? '#ffdd44' : '#ffffff';
+      ctx.strokeStyle = 'rgba(0,0,0,0.70)';
+      ctx.lineWidth = dn.critical ? 5 : 4;
+      const text = `-${dn.amount}`;
+      ctx.strokeText(text, sx, sy);
+      ctx.fillText(text, sx, sy);
+      ctx.restore();
+    }
   }
 }

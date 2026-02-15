@@ -19,6 +19,8 @@ export const KEYBINDS = {
   shoutLetsGo: ['KeyL'],
   shoutHi: ['KeyR'],
 
+  overviewToggle: ['KeyZ'],
+
   helpToggle: ['Slash'], // Shift + / => '?'
   helpClose: ['Escape'],
 };
@@ -93,6 +95,10 @@ export const HELP_SECTIONS = [
   {
     title: 'Help',
     rows: [
+      {
+        combos: [KEYBINDS.overviewToggle],
+        text: 'Toggle battlefield view (zoom out to see both castles).',
+      },
       {
         keysText: '?',
         text: 'Toggle this help screen.',

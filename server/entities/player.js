@@ -73,6 +73,7 @@ class Player extends Entity {
     this.socketId = null;
     this.isOnWall = role === TYPE_ARCHER || role === TYPE_GUNNER;
     this.isHuman = true;
+    this.controlsRoyalId = null; // when set, player input drives that royal (FINAL_STAND)
 
     this.input = { dx: 0, dy: 0, atk: false, blk: false, aimX: 0, aimY: 0 };
 
@@ -116,7 +117,7 @@ class Player extends Entity {
   }
 
   serialize() {
-    // [id, role, team, x, y, hp, state, facing, lives, isOnWall]
+    // [id, role, team, x, y, hp, state, facing, lives, isOnWall, controlsRoyalId]
     return [
       this.id,
       this.role,
@@ -128,6 +129,7 @@ class Player extends Entity {
       this.facing,
       this.lives,
       this.isOnWall ? 1 : 0,
+      this.controlsRoyalId != null ? this.controlsRoyalId : 0,
     ];
   }
 }

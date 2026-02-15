@@ -10,6 +10,7 @@ export class Input {
     this.mouseWorldX = 0;
     this.mouseWorldY = 0;
     this.tabPressed = false;
+    this.overviewPressed = false;
     this.pendingShout = null;
 
     window.addEventListener('keydown', (e) => {
@@ -28,6 +29,11 @@ export class Input {
         e.preventDefault();
         this.tabPressed = true;
       }
+
+      if (KEYBINDS.overviewToggle && KEYBINDS.overviewToggle.includes(e.code) && !e.repeat) {
+        e.preventDefault();
+        this.overviewPressed = true;
+      }
     });
 
     window.addEventListener('keyup', (e) => {
@@ -44,6 +50,7 @@ export class Input {
   clearKeys() {
     this.keys.clear();
     this.tabPressed = false;
+    this.overviewPressed = false;
     this.pendingShout = null;
   }
 
@@ -88,6 +95,12 @@ export class Input {
     const t = this.tabPressed;
     this.tabPressed = false;
     return t;
+  }
+
+  consumeOverviewToggle() {
+    const v = this.overviewPressed;
+    this.overviewPressed = false;
+    return v;
   }
 
   toInputMessage() {

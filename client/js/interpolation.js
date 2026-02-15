@@ -38,7 +38,7 @@ export class Interpolation {
       tick: snap2.tick,
       phase: snap2.phase,
       soldiers: this._lerpEntityArrays(snap1.soldiers, snap2.soldiers, t),
-      projectiles: snap2.projectiles,
+      projectiles: this._lerpProjectileArrays(snap1.projectiles, snap2.projectiles, t),
       royals: this._lerpEntityArrays(snap1.royals, snap2.royals, t),
       players: this._lerpPlayerArrays(snap1.players, snap2.players, t),
       gates: snap2.gates,
@@ -79,6 +79,28 @@ export class Interpolation {
       const result = [...ent2];
       result[3] = ent1[3] + (ent2[3] - ent1[3]) * t;
       result[4] = ent1[4] + (ent2[4] - ent1[4]) * t;
+      return result;
+    });
+  }
+
+  _lerpProjectileArrays(arr1, arr2, t) {
+    const map1 = new Map();
+    if (arr1) {
+      for (const p of arr1) map1.set(p[0], p);
+    }
+    if (!arr2) return arr1 || [];
+
+    return arr2.map(p2 => {
+      const p1 = map1.get(p2[0]);
+      if (!p1) return p2;
+
+      // Projectiles: [id, type, team, x, y, ownerId, dist]
+      const result = [...p2];
+      result[3] = p1[3] + (p2[3] - p1[3]) * t;
+      result[4] = p1[4] + (p2[4] - p1[4]) * t;
+      const d1 = p1[6] || 0;
+      const d2 = p2[6] || 0;
+      result[6] = d1 + (d2 - d1) * t;
       return result;
     });
   }

@@ -22,6 +22,7 @@ import {
   TYPE_CATAPULT,
   PROJ_ARROW,
   PROJ_ROCK,
+  PROJ_BULLET,
   STATE_IDLE,
   STATE_DEAD,
   STATE_BLOCK,
@@ -39,6 +40,7 @@ import {
   SWORD_RANGE,
   SWORD_DAMAGE,
   ARROW_SPEED,
+  BULLET_SPEED,
   ROCK_SPEED,
   ATTACK_TIMING_VARIANCE,
   CATAPULT_CHARGE_MS,
@@ -55,6 +57,7 @@ import {
   RED_WALL_SPAWN_MAX,
   GROUND_Y_MAX,
   SHOUT_COOLDOWN_MS,
+  ROYAL_SPEED,
 } from '../shared/constants.js';
 import {
   EVT_DEATH,
@@ -63,6 +66,7 @@ import {
   EVT_PHASE,
   EVT_SHOUT,
   EVT_CALLOUT,
+  EVT_AIM,
   EVT_GAMEOVER,
   EVT_GATE_BREAK,
   EVT_ROYAL_SPAWN,
@@ -213,6 +217,18 @@ class Simulation {
         soldier, enemies, friendlies, this.spatialHash, this.phase, gateX, dt
       );
 
+      if (result.telegraph && Number.isFinite(result.telegraph.tx) && Number.isFinite(result.telegraph.ty)) {
+        this.events.push({
+          tick: this.tick,
+          e: EVT_AIM,
+          id: soldier.id,
+          tx: Math.round(result.telegraph.tx),
+          ty: Math.round(result.telegraph.ty),
+          tw: result.telegraph.tw ? 1 : 0,
+          ms: Math.round(result.telegraph.ms || 0),
+        });
+      }
+
       if (result.action === 'melee' && result.target) {
         if (checkMeleeHit(soldier, result.target, soldier.attackRange)) {
           const res = processMeleeAttack(soldier, result.target, soldier.damage);
@@ -240,6 +256,14 @@ class Simulation {
           result.vy,
           soldier.id
         );
+        if (result.projType === PROJ_ARROW || result.projType === PROJ_BULLET) {
+          // Allow per-soldier tuning (ex: AI gunner nerfs) without changing wire format.
+          proj.damage = soldier.damage;
+        }
+        if (result.projType === PROJ_BULLET) {
+          // Keep AI bullets from flying the full world width (BULLET_RANGE is tuned for players).
+          proj.maxRange = soldier.attackRange;
+        }
         this.projectiles.push(proj);
         this.events.push({
           tick: this.tick,
@@ -254,18 +278,26 @@ class Simulation {
         const hit = processHitscan(
           soldier.x, soldier.y,
           result.target.x, result.target.y,
-          soldier.team, enemies2, soldier.attackRange
+          soldier.team, enemies2, soldier.attackRange,
+          {
+            // Wall gunners were too oppressive; make AI gunners less accurate and
+            // avoid shooting targets right at the base of the wall.
+            yForgiveness: soldier.type === TYPE_GUNNER ? 10 : undefined,
+            minRange: (soldier.type === TYPE_GUNNER && soldier.isOnWall) ? 140 : 0,
+          }
         );
         if (hit) {
-          hit.takeDamage(soldier.damage);
+          const target = hit.entity;
+          const dmg = soldier.damage;
+          target.takeDamage(dmg);
           this.events.push({
             tick: this.tick,
             e: EVT_HIT,
             attackerId: soldier.id,
-            victimId: hit.id,
-            dmg: soldier.damage,
-            x: Math.round(hit.x),
-            y: Math.round(hit.y),
+            victimId: target.id,
+            dmg,
+            x: Math.round(target.x),
+            y: Math.round(target.y),
           });
           this.events.push({
             tick: this.tick,
@@ -275,8 +307,8 @@ class Simulation {
             x: Math.round(soldier.x),
             y: Math.round(soldier.y),
           });
-          if (hit.isDead) {
-            this._handleEntityDeath(hit);
+          if (target.isDead) {
+            this._handleEntityDeath(target);
           }
         }
       } else if (result.action === 'gate_melee') {
@@ -321,7 +353,8 @@ class Simulation {
         player.respawnTimer -= dt * 1000;
         if (player.respawnTimer <= 0 && player.lives > 0) {
           let spawnX, spawnY;
-          const isWall = player.role === TYPE_ARCHER || player.role === TYPE_GUNNER;
+	          // If a wall unit was "dropped" during the siege, keep them on the ground for respawns.
+	          const isWall = player.isOnWall;
 
           if (player.team === TEAM_BLUE) {
             if (isWall) {
@@ -476,6 +509,7 @@ class Simulation {
             this.genId(), PROJ_ARROW, player.team,
             player.x, player.y, vx, vy, player.id
           );
+          proj.damage = player.damage;
           this.projectiles.push(proj);
           this.events.push({
             tick: this.tick,
@@ -486,25 +520,31 @@ class Simulation {
             y: Math.round(player.y),
           });
         } else if (player.role === TYPE_GUNNER) {
-          // Hitscan toward aim point
-          const hit = processHitscan(
-            player.x, player.y, aimX, aimY,
-            player.team, enemies, player.attackRange
-          );
-          if (hit) {
-            hit.takeDamage(player.damage);
+          // Fire a bullet projectile toward aim point (dodgeable, readable).
+          const adx = aimX - player.x;
+          const ady = aimY - player.y;
+          const alen = Math.sqrt(adx * adx + ady * ady);
+
+          // Prevent "point-blank deletion" from castle walls.
+          if (!(player.isOnWall && alen < 120)) {
+            const vx = alen > 0 ? (adx / alen) * BULLET_SPEED : BULLET_SPEED;
+            const vy = alen > 0 ? (ady / alen) * BULLET_SPEED : 0;
+
+            const proj = new Projectile(
+              this.genId(), PROJ_BULLET, player.team,
+              player.x, player.y, vx, vy, player.id
+            );
+            proj.damage = player.damage;
+            proj.maxRange = player.attackRange;
+            this.projectiles.push(proj);
             this.events.push({
               tick: this.tick,
-              e: EVT_HIT,
-              attackerId: player.id,
-              victimId: hit.id,
-              dmg: player.damage,
-              x: Math.round(hit.x),
-              y: Math.round(hit.y),
+              e: EVT_FIRE,
+              id: player.id,
+              type: PROJ_BULLET,
+              x: Math.round(player.x),
+              y: Math.round(player.y),
             });
-            if (hit.isDead) {
-              this._handleEntityDeath(hit);
-            }
           }
         }
       }
@@ -517,8 +557,10 @@ class Simulation {
       const controlPlayer = this.players.find(
         p => p.id === royal.controllingPlayerId
       );
-      // Fallback to AI if controller is gone, spectating, or dead
-      if (!controlPlayer || controlPlayer.state === STATE_SPECTATING || controlPlayer.isDead) {
+      const isController = !!controlPlayer && controlPlayer.controlsRoyalId === royal.id;
+      // Fallback to AI if controller is gone. If a player is explicitly assigned to this
+      // royal, allow them to "spectate" (their avatar disappears) while still controlling it.
+      if (!controlPlayer || (!isController && (controlPlayer.state === STATE_SPECTATING || controlPlayer.isDead))) {
         royal.isHumanControlled = false;
         royal.controllingPlayerId = null;
         continue;
@@ -529,7 +571,7 @@ class Simulation {
       // Movement
       if (dx !== 0 || dy !== 0) {
         const len = Math.sqrt(dx * dx + dy * dy);
-        updateEntityMovement(royal, dx / len, dy / len, PLAYER_SPEED, dt);
+        updateEntityMovement(royal, dx / len, dy / len, ROYAL_SPEED * royal.speedMultiplier, dt);
       }
 
       // Reduce cooldown
@@ -632,6 +674,7 @@ class Simulation {
         const winKey = newWinningTeam === TEAM_BLUE ? 'blue' : 'red';
         if (!this.wallUnitsDropped[winKey]) {
           this.armyManager.dropWallUnits(newWinningTeam);
+          this._dropWallPlayers(newWinningTeam);
           this.wallUnitsDropped[winKey] = true;
         }
 
@@ -652,6 +695,7 @@ class Simulation {
           const loseKey = losingTeam === TEAM_BLUE ? 'blue' : 'red';
           if (!this.wallUnitsDropped[loseKey]) {
             this.armyManager.dropWallUnits(losingTeam);
+            this._dropWallPlayers(losingTeam);
             this.wallUnitsDropped[loseKey] = true;
           }
         }
@@ -675,17 +719,26 @@ class Simulation {
           p => p.team === losingTeam && p.state !== STATE_SPECTATING
         );
 
-        if (losingPlayers.length >= 2) {
-          // Co-op defending: P1=King, P2=Queen
-          king.isHumanControlled = true;
-          king.controllingPlayerId = losingPlayers[0].id;
-          queen.isHumanControlled = true;
-          queen.controllingPlayerId = losingPlayers[1].id;
-        } else if (losingPlayers.length === 1) {
-          // Versus defending or single player: human = King, AI = Queen
-          king.isHumanControlled = true;
-          king.controllingPlayerId = losingPlayers[0].id;
-        }
+	        if (losingPlayers.length >= 2) {
+	          // Co-op defending: P1=King, P2=Queen
+	          king.isHumanControlled = true;
+	          king.controllingPlayerId = losingPlayers[0].id;
+	          queen.isHumanControlled = true;
+	          queen.controllingPlayerId = losingPlayers[1].id;
+	          losingPlayers[0].controlsRoyalId = king.id;
+	          losingPlayers[0].state = STATE_SPECTATING;
+	          losingPlayers[0].isOnWall = false;
+	          losingPlayers[1].controlsRoyalId = queen.id;
+	          losingPlayers[1].state = STATE_SPECTATING;
+	          losingPlayers[1].isOnWall = false;
+	        } else if (losingPlayers.length === 1) {
+	          // Versus defending or single player: human = King, AI = Queen
+	          king.isHumanControlled = true;
+	          king.controllingPlayerId = losingPlayers[0].id;
+	          losingPlayers[0].controlsRoyalId = king.id;
+	          losingPlayers[0].state = STATE_SPECTATING;
+	          losingPlayers[0].isOnWall = false;
+	        }
         // else: both AI controlled
 
         this.royals.push(king, queen);
@@ -741,13 +794,14 @@ class Simulation {
             // Truly equal -- pick a side randomly
             loser = Math.random() < 0.5 ? TEAM_BLUE : TEAM_RED;
           }
-          this._forcedLosingTeam = loser;
-          // Drop the loser's wall units to ground so the winner can assault them
-          this.armyManager.dropWallUnits(loser);
-        } else {
-          // One side still has ground troops, the other doesn't
-          this._forcedLosingTeam = blueGround === 0 ? TEAM_BLUE : TEAM_RED;
-        }
+	          this._forcedLosingTeam = loser;
+	          // Drop the loser's wall units to ground so the winner can assault them
+	          this.armyManager.dropWallUnits(loser);
+	          this._dropWallPlayers(loser);
+	        } else {
+	          // One side still has ground troops, the other doesn't
+	          this._forcedLosingTeam = blueGround === 0 ? TEAM_BLUE : TEAM_RED;
+	        }
 
         this.phase = PHASE_CASTLE_ASSAULT;
         this.events.push({
@@ -779,6 +833,17 @@ class Simulation {
       entity.die(); // Overrides STATE_DEAD from takeDamage → RESPAWNING or SPECTATING
     }
     // For non-humans, takeDamage() already set STATE_DEAD
+  }
+
+  _dropWallPlayers(team) {
+    for (const p of this.players) {
+      if (p.team !== team) continue;
+      if (!p.isOnWall) continue;
+      if (p.state === STATE_SPECTATING) continue;
+      p.isOnWall = false;
+      // Keep them usable on the ground (spread out a bit).
+      p.y = Math.random() * GROUND_Y_MAX;
+    }
   }
 
   _getLosingTeam() {

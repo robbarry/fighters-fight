@@ -3,9 +3,21 @@ import {
   MELEE_Y_FORGIVENESS,
   SHIELD_BLOCK_REDUCTION,
   ROCK_AOE_RADIUS,
+  PROJ_ARROW,
   PROJ_ROCK,
+  PROJ_BULLET,
 } from '../../shared/constants.js';
 import { EVT_HIT } from '../../shared/message-types.js';
+
+function projectileHitRadius(type) {
+  // Tune for play feel: bullets should be dodgeable, arrows slightly forgiving, rocks chunky.
+  switch (type) {
+    case PROJ_BULLET: return 9;
+    case PROJ_ARROW: return 12;
+    case PROJ_ROCK: return 18;
+    default: return 15;
+  }
+}
 
 export function checkMeleeHit(attacker, target, range) {
   if (target.isOnWall) return false;
@@ -25,7 +37,7 @@ export function processMeleeAttack(attacker, target, damage) {
   return { hit: true, damage: actualDamage };
 }
 
-export function processHitscan(shooterX, shooterY, aimX, aimY, team, entities, range) {
+export function processHitscan(shooterX, shooterY, aimX, aimY, team, entities, range, opts = {}) {
   // Compute ray direction
   const rdx = aimX - shooterX;
   const rdy = aimY - shooterY;
@@ -34,6 +46,9 @@ export function processHitscan(shooterX, shooterY, aimX, aimY, team, entities, r
 
   const dirX = rdx / len;
   const dirY = rdy / len;
+
+  const yForgiveness = Number.isFinite(opts.yForgiveness) ? opts.yForgiveness : MELEE_Y_FORGIVENESS;
+  const minRange = Number.isFinite(opts.minRange) ? opts.minRange : 0;
 
   let closestHit = null;
   let closestDist = Infinity;
@@ -48,12 +63,12 @@ export function processHitscan(shooterX, shooterY, aimX, aimY, team, entities, r
     const dot = ex * dirX + ey * dirY;
 
     // Must be in front of shooter and within range
-    if (dot < 0 || dot > range) continue;
+    if (dot < minRange || dot > range) continue;
 
     // Perpendicular distance from entity to the ray
     const perpDist = Math.abs(ex * dirY - ey * dirX);
 
-    if (perpDist <= MELEE_Y_FORGIVENESS) {
+    if (perpDist <= yForgiveness) {
       if (dot < closestDist) {
         closestDist = dot;
         closestHit = entity;
@@ -61,7 +76,8 @@ export function processHitscan(shooterX, shooterY, aimX, aimY, team, entities, r
     }
   }
 
-  return closestHit;
+  if (!closestHit) return null;
+  return { entity: closestHit, dist: closestDist };
 }
 
 export function processProjectileCollisions(projectiles, allEntities, spatialHash, events) {
@@ -94,7 +110,8 @@ export function processProjectileCollisions(projectiles, allEntities, spatialHas
         proj.x, proj.y
       );
 
-      if (closestDist <= 15) { // hit radius
+      const hitRadius = projectileHitRadius(proj.type);
+      if (closestDist <= hitRadius) {
         // Pick closest to start of sweep
         const dx = entity.x - proj.prevX;
         const dy = entity.y - proj.prevY;
@@ -107,7 +124,19 @@ export function processProjectileCollisions(projectiles, allEntities, spatialHas
     }
 
     if (hitEntity) {
-      hitEntity.takeDamage(proj.damage);
+      let actualDamage = proj.damage;
+      if (proj.type === PROJ_BULLET) {
+        const range = proj.maxRange || 1;
+        const t = Math.max(0, Math.min(1, (proj.distanceTraveled || 0) / range));
+        const minMult = 0.35;
+        const mult = 1 - (1 - minMult) * t;
+        actualDamage = Math.max(1, actualDamage * mult);
+      }
+      if (hitEntity.state === STATE_BLOCK) {
+        actualDamage *= (1 - SHIELD_BLOCK_REDUCTION);
+      }
+      actualDamage = Math.max(1, actualDamage);
+      hitEntity.takeDamage(actualDamage);
       proj.alive = false;
 
       hitEvents.push({
@@ -115,7 +144,7 @@ export function processProjectileCollisions(projectiles, allEntities, spatialHas
         e: EVT_HIT,
         attackerId: proj.ownerId,
         victimId: hitEntity.id,
-        dmg: proj.damage,
+        dmg: Math.round(actualDamage),
         x: Math.round(hitEntity.x),
         y: Math.round(hitEntity.y),
       });
@@ -131,13 +160,18 @@ export function processProjectileCollisions(projectiles, allEntities, spatialHas
           const adx = ae.x - hitEntity.x;
           const ady = ae.y - hitEntity.y;
           if (Math.sqrt(adx * adx + ady * ady) <= ROCK_AOE_RADIUS) {
-            ae.takeDamage(proj.damage);
+            let aoeDamage = proj.damage;
+            if (ae.state === STATE_BLOCK) {
+              aoeDamage *= (1 - SHIELD_BLOCK_REDUCTION);
+            }
+            aoeDamage = Math.max(1, aoeDamage);
+            ae.takeDamage(aoeDamage);
             hitEvents.push({
               tick: 0,
               e: EVT_HIT,
               attackerId: proj.ownerId,
               victimId: ae.id,
-              dmg: proj.damage,
+              dmg: Math.round(aoeDamage),
               x: Math.round(ae.x),
               y: Math.round(ae.y),
             });

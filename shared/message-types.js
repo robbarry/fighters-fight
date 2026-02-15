@@ -23,6 +23,7 @@ export const EVT_CALLOUT = 5;
 export const EVT_GAMEOVER = 6;
 export const EVT_GATE_BREAK = 7;
 export const EVT_ROYAL_SPAWN = 8;
+export const EVT_AIM = 9;
 
 // ─── Shout Types ─────────────────────────────────────────
 export const SHOUT_HELP = 0;

@@ -10,12 +10,13 @@ import {
   TYPE_ARCHER,
   TYPE_GUNNER,
   PROJ_ARROW,
+  PROJ_BULLET,
   SOLDIER_BASE_SPEED,
   ENGAGE_SPEED_MULT,
   ENGAGE_RANGE,
   SWORD_RANGE,
   ARROW_SPEED,
-  BULLET_RANGE,
+  BULLET_SPEED,
   ATTACK_TIMING_VARIANCE,
   DEATH_ANIM_MS,
   PHASE_ARMY_MARCH,
@@ -26,8 +27,51 @@ import {
   ROYAL_SPEED,
   FACING_RIGHT,
   FACING_LEFT,
+  GROUND_Y_MAX,
+  MELEE_Y_FORGIVENESS,
 } from '../../shared/constants.js';
 import { updateEntityMovement } from './physics.js';
+
+function wallMinRangeFor(soldier) {
+  if (!soldier.isOnWall) return 0;
+  if (soldier.type === TYPE_GUNNER) return 220;
+  if (soldier.type === TYPE_ARCHER) return 180;
+  return 0;
+}
+
+function rangedWindupMsFor(soldier) {
+  // Reaction time + a bit of variance keeps ranged units from "insta-firing"
+  // the instant someone crosses into their range.
+  if (soldier.type === TYPE_GUNNER) return 360 + Math.random() * 220;
+  if (soldier.type === TYPE_ARCHER) return 280 + Math.random() * 200;
+  return 0;
+}
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function computeAiAimPoint(shooter, target, range) {
+  const dx = target.x - shooter.x;
+  const dy = target.y - shooter.y;
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+  const t = clamp(dist / (range || 1), 0, 1);
+
+  // Error grows with distance to avoid oppressive long-range precision.
+  const baseErrX = shooter.type === TYPE_GUNNER ? 10 : 14;
+  const baseErrY = shooter.type === TYPE_GUNNER ? 3 : 4;
+  const distErrX = shooter.type === TYPE_GUNNER ? 26 : 34;
+  const distErrY = shooter.type === TYPE_GUNNER ? 9 : 12;
+
+  const errX = (Math.random() * 2 - 1) * (baseErrX + distErrX * t);
+  const errY = (Math.random() * 2 - 1) * (baseErrY + distErrY * t);
+
+  return {
+    x: target.x + errX,
+    y: clamp(target.y + errY, 0, GROUND_Y_MAX),
+    isOnWall: !!target.isOnWall,
+  };
+}
 
 export function updateSoldierAI(soldier, enemies, friendlies, spatialHash, phase, gateX, dt) {
   const dtMs = dt * 1000;
@@ -70,8 +114,13 @@ export function updateSoldierAI(soldier, enemies, friendlies, spatialHash, phase
     case STATE_MARCH: {
       if (soldier.isOnWall) {
         // Wall units don't march; only engage enemies actually within their attack range
+        const minRange = wallMinRangeFor(soldier);
         const inRange = enemies.filter(
-          e => !e.isDead && Math.abs(e.x - soldier.x) <= soldier.attackRange
+          e => {
+            if (e.isDead) return false;
+            const dx = Math.abs(e.x - soldier.x);
+            return dx <= soldier.attackRange && dx >= minRange;
+          }
         );
         if (inRange.length > 0) {
           soldier.state = STATE_ENGAGE;
@@ -117,8 +166,17 @@ export function updateSoldierAI(soldier, enemies, friendlies, spatialHash, phase
 
       // Check if in attack range
       const dist = Math.abs(soldier.x - soldier.target.x);
-      if (dist <= soldier.attackRange) {
+      const dy = Math.abs(soldier.y - soldier.target.y);
+      const isRanged = soldier.type === TYPE_ARCHER || soldier.type === TYPE_GUNNER;
+      const minRange = wallMinRangeFor(soldier);
+      if (dist <= soldier.attackRange && dist >= minRange && (isRanged || dy <= MELEE_Y_FORGIVENESS)) {
         soldier.state = STATE_ATTACK;
+        return { action: null };
+      }
+      if (soldier.isOnWall && minRange > 0 && dist < minRange) {
+        // Too close for comfortable ranged fire from the wall; try a different target.
+        soldier.target = null;
+        soldier.targetRefreshTimer = 0;
         return { action: null };
       }
 
@@ -143,6 +201,8 @@ export function updateSoldierAI(soldier, enemies, friendlies, spatialHash, phase
 
     case STATE_ATTACK: {
       if (!soldier.target || soldier.target.isDead) {
+        soldier._windupMs = 0;
+        soldier._pendingAttack = null;
         soldier.state = STATE_ENGAGE;
         soldier.target = null;
         return { action: null };
@@ -152,13 +212,47 @@ export function updateSoldierAI(soldier, enemies, friendlies, spatialHash, phase
       const dist = Math.abs(soldier.x - soldier.target.x);
       if (dist > soldier.attackRange * 1.1) {
         // Add a small hysteresis to avoid flip-flopping
+        soldier._windupMs = 0;
+        soldier._pendingAttack = null;
         soldier.state = STATE_ENGAGE;
+        return { action: null };
+      }
+
+      // Melee shouldn't sit in ATTACK while they're not y-aligned (it looks like "attacking air").
+      const dy = Math.abs(soldier.y - soldier.target.y);
+      const isRanged = soldier.type === TYPE_ARCHER || soldier.type === TYPE_GUNNER;
+      if (!isRanged && dy > MELEE_Y_FORGIVENESS) {
+        soldier._windupMs = 0;
+        soldier._pendingAttack = null;
+        soldier.state = STATE_ENGAGE;
+        return { action: null };
+      }
+
+      // Wall ranged units have a minimum range (prevents point-blank "wall deletion zones").
+      const minRange = wallMinRangeFor(soldier);
+      if (soldier.isOnWall && minRange > 0 && dist < minRange) {
+        soldier._windupMs = 0;
+        soldier._pendingAttack = null;
+        soldier.state = STATE_ENGAGE;
+        soldier.target = null;
         return { action: null };
       }
 
       // Face toward target
       if (soldier.target.x > soldier.x) soldier.facing = FACING_RIGHT;
       else if (soldier.target.x < soldier.x) soldier.facing = FACING_LEFT;
+
+      // Ranged windup: show intent + give players a moment to react.
+      if (soldier._windupMs == null) soldier._windupMs = 0;
+      if (soldier._windupMs > 0) {
+        soldier._windupMs -= dtMs;
+        if (soldier._windupMs > 0) return { action: null };
+
+        soldier._windupMs = 0;
+        const pending = soldier._pendingAttack || null;
+        soldier._pendingAttack = null;
+        if (pending) return pending;
+      }
 
       // Attack on cooldown
       if (soldier.attackCooldownTimer <= 0) {
@@ -167,27 +261,37 @@ export function updateSoldierAI(soldier, enemies, friendlies, spatialHash, phase
         soldier.attackCooldownTimer = soldier.attackCooldownBase * variance;
 
         // Determine attack type
-        if (soldier.type === TYPE_ARCHER) {
-          // Archer fires a projectile
-          const dx = soldier.target.x - soldier.x;
-          const dy = soldier.target.y - soldier.y;
+        if (soldier.type === TYPE_ARCHER || soldier.type === TYPE_GUNNER) {
+          const windupMs = rangedWindupMsFor(soldier);
+          const aim = computeAiAimPoint(soldier, soldier.target, soldier.attackRange);
+          const projType = soldier.type === TYPE_GUNNER ? PROJ_BULLET : PROJ_ARROW;
+          const speed = soldier.type === TYPE_GUNNER ? BULLET_SPEED : ARROW_SPEED;
+
+          const dx = aim.x - soldier.x;
+          const dy = aim.y - soldier.y;
           const len = Math.sqrt(dx * dx + dy * dy);
-          const vx = len > 0 ? (dx / len) * ARROW_SPEED : ARROW_SPEED;
-          const vy = len > 0 ? (dy / len) * ARROW_SPEED : 0;
-          return {
+          const vx = len > 0 ? (dx / len) * speed : speed;
+          const vy = len > 0 ? (dy / len) * speed : 0;
+
+          soldier._windupMs = windupMs;
+          soldier._pendingAttack = {
             action: 'projectile',
-            projType: PROJ_ARROW,
+            projType,
             x: soldier.x,
             y: soldier.y,
             vx,
             vy,
             target: soldier.target,
           };
-        } else if (soldier.type === TYPE_GUNNER) {
-          // Gunner fires hitscan
+
           return {
-            action: 'hitscan',
-            target: soldier.target,
+            action: null,
+            telegraph: {
+              tx: aim.x,
+              ty: aim.y,
+              tw: aim.isOnWall ? 1 : 0,
+              ms: Math.round(windupMs),
+            },
           };
         } else {
           // Melee attack (sword or spear)
@@ -248,14 +352,15 @@ export function pickTarget(soldier, enemies, spatialHash) {
 
   // Wall units prefer enemies within their range
   if (soldier.isOnWall) {
+    const minRange = wallMinRangeFor(soldier);
     const inRange = alive.filter(
-      e => Math.abs(e.x - soldier.x) <= soldier.attackRange
+      e => {
+        const dx = Math.abs(e.x - soldier.x);
+        return dx <= soldier.attackRange && dx >= minRange;
+      }
     );
-    if (inRange.length > 0) {
-      return pickFromPool(soldier, inRange);
-    }
-    // If no one in range, pick from all alive anyway
-    return pickFromPool(soldier, alive);
+    if (inRange.length === 0) return null;
+    return pickFromPool(soldier, inRange);
   }
 
   return pickFromPool(soldier, alive);
@@ -264,9 +369,18 @@ export function pickTarget(soldier, enemies, spatialHash) {
 function pickFromPool(soldier, pool) {
   if (pool.length === 0) return null;
 
+  // Wall gunners focusing "nearest" created instant-death zones at the gates.
+  // Spread their fire around a bit more for better play feel.
+  let nearestPct = TARGET_NEAREST_PCT;
+  let randomPct = TARGET_RANDOM_PCT;
+  if (soldier.isOnWall && soldier.type === TYPE_GUNNER) {
+    nearestPct = 0.40;
+    randomPct = 0.45;
+  }
+
   const roll = Math.random();
 
-  if (roll < TARGET_NEAREST_PCT) {
+  if (roll < nearestPct) {
     // Nearest by distance
     let nearest = null;
     let nearestDist = Infinity;
@@ -278,7 +392,7 @@ function pickFromPool(soldier, pool) {
       }
     }
     return nearest;
-  } else if (roll < TARGET_NEAREST_PCT + TARGET_RANDOM_PCT) {
+  } else if (roll < nearestPct + randomPct) {
     // Random
     return pool[Math.floor(Math.random() * pool.length)];
   } else {

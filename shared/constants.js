@@ -17,6 +17,7 @@ export const TYPE_CATAPULT = 4;
 // ─── Projectile Types ────────────────────────────────────
 export const PROJ_ARROW = 0;
 export const PROJ_ROCK = 1;
+export const PROJ_BULLET = 2;
 
 // ─── Entity States ───────────────────────────────────────
 export const STATE_IDLE = 0;
@@ -69,31 +70,31 @@ export const RED_WALL_SPAWN_MAX = WORLD_WIDTH - 30;
 // ─── Player ──────────────────────────────────────────────
 export const PLAYER_LIVES = 10;
 export const PLAYER_HP = 40;
-export const PLAYER_SPEED = 150;
+export const PLAYER_SPEED = 230;
 
 // ─── Soldier Stats ───────────────────────────────────────
 export const SWORD_HP = 40;
 export const SPEAR_HP = 40;
 export const ARCHER_HP = 30;
 export const GUNNER_HP = 30;
-export const SOLDIER_BASE_SPEED = 80;
+export const SOLDIER_BASE_SPEED = 125;
 export const SPEED_VARIANCE = 0.15;
 export const ENGAGE_SPEED_MULT = 1.3;
 
 // ─── Army Composition (per side, 140 total) ──────────────
-export const ARMY_SWORD_COUNT = 50;
-export const ARMY_SPEAR_COUNT = 40;
-export const ARMY_ARCHER_COUNT = 30;
-export const ARMY_GUNNER_COUNT = 20;
+export const ARMY_SWORD_COUNT = 60;
+export const ARMY_SPEAR_COUNT = 48;
+export const ARMY_ARCHER_COUNT = 22;
+export const ARMY_GUNNER_COUNT = 10;
 export const ARMY_TOTAL = ARMY_SWORD_COUNT + ARMY_SPEAR_COUNT + ARMY_ARCHER_COUNT + ARMY_GUNNER_COUNT;
 
 // ─── Combat: Sword ───────────────────────────────────────
-export const SWORD_DAMAGE = 8;
-export const SWORD_RANGE = 30;
+export const SWORD_DAMAGE = 9;
+export const SWORD_RANGE = 34;
 export const SWORD_COOLDOWN = 800;
 
 // ─── Combat: Spear ───────────────────────────────────────
-export const SPEAR_DAMAGE = 7;
+export const SPEAR_DAMAGE = 8;
 export const SPEAR_RANGE = 50;
 export const SPEAR_COOLDOWN = 900;
 
@@ -104,8 +105,9 @@ export const ARROW_SPEED = 400;
 export const ARROW_COOLDOWN = 1200;
 
 // ─── Combat: Gunner ──────────────────────────────────────
-export const BULLET_DAMAGE = 10;
-export const BULLET_RANGE = 1000;
+export const BULLET_DAMAGE = 8;
+export const BULLET_RANGE = 6000;
+export const BULLET_SPEED = 850;
 export const BULLET_COOLDOWN = 1500;
 
 // ─── Combat: Catapult ────────────────────────────────────
@@ -119,8 +121,8 @@ export const CATAPULT_CHARGE_SPEED_MAX_MULT = 1.7;
 export const CATAPULT_CHARGE_DAMAGE_MAX_MULT = 1.35;
 
 // ─── Combat: General ─────────────────────────────────────
-export const MELEE_Y_FORGIVENESS = 20;
-export const ENGAGE_RANGE = 200;
+export const MELEE_Y_FORGIVENESS = 26;
+export const ENGAGE_RANGE = 240;
 export const SHIELD_BLOCK_REDUCTION = 0.8;
 export const ATTACK_TIMING_VARIANCE = 0.20;
 
@@ -135,7 +137,7 @@ export const KING_DAMAGE = 12;
 export const QUEEN_DAMAGE = 10;
 export const KING_COOLDOWN = 700;
 export const QUEEN_COOLDOWN = 600;
-export const ROYAL_SPEED = 60;
+export const ROYAL_SPEED = 85;
 
 // ─── Spatial Hash ────────────────────────────────────────
 export const SPATIAL_CELL_SIZE = 100;

@@ -1,9 +1,12 @@
 import {
   PROJ_ARROW,
   PROJ_ROCK,
+  PROJ_BULLET,
   ARROW_DAMAGE,
+  BULLET_DAMAGE,
   ROCK_DAMAGE,
   ARROW_RANGE,
+  BULLET_RANGE,
   ROCK_RANGE,
 } from '../../shared/constants.js';
 
@@ -19,9 +22,15 @@ class Projectile {
     this.prevX = x;
     this.prevY = y;
     this.ownerId = ownerId;
-    this.damage = type === PROJ_ARROW ? ARROW_DAMAGE : ROCK_DAMAGE;
+    this.damage =
+      type === PROJ_ARROW ? ARROW_DAMAGE :
+      type === PROJ_BULLET ? BULLET_DAMAGE :
+      ROCK_DAMAGE;
     this.distanceTraveled = 0;
-    this.maxRange = type === PROJ_ARROW ? ARROW_RANGE : ROCK_RANGE;
+    this.maxRange =
+      type === PROJ_ARROW ? ARROW_RANGE :
+      type === PROJ_BULLET ? BULLET_RANGE :
+      ROCK_RANGE;
     this.alive = true;
   }
 

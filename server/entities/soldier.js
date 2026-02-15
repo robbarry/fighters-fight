@@ -86,6 +86,15 @@ class Soldier extends Entity {
     this.isOnWall = type === TYPE_ARCHER || type === TYPE_GUNNER;
     this.isRemovable = false;
     this.isHuman = false;
+
+    // Balance: wall gunners were deleting attackers too quickly, especially in castle assault.
+    // Nerf AI gunners (not humans) by making them shorter-range, lower-damage, and slower-firing.
+    // Note: BULLET_RANGE is tuned for players (including long-range shots); AI gets a hard cap.
+    if (type === TYPE_GUNNER) {
+      this.damage = Math.max(1, Math.round(this.damage * 0.65));
+      this.attackCooldownBase = Math.round(this.attackCooldownBase * 1.65);
+      this.attackRange = Math.min(this.attackRange, 1100);
+    }
   }
 
   serialize() {

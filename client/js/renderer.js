@@ -2,8 +2,8 @@ import { TEAM_BLUE, TEAM_RED, TYPE_SWORD, TYPE_SPEAR, TYPE_ARCHER, TYPE_GUNNER, 
 	         STATE_DEAD, STATE_BLOCK, STATE_ATTACK, STATE_RESPAWNING, STATE_SPECTATING,
 	         BODY_WIDTH, BODY_HEIGHT, HEAD_RADIUS, ROYAL_SCALE,
 	         CASTLE_WIDTH, BLUE_CASTLE_X, RED_CASTLE_X, WORLD_WIDTH, GROUND_Y_MAX,
-	         GATE_HP, PROJ_ARROW, PROJ_ROCK,
-	         ARROW_RANGE, ROCK_RANGE,
+	         GATE_HP, PROJ_ARROW, PROJ_ROCK, PROJ_BULLET,
+	         ARROW_RANGE, ROCK_RANGE, BULLET_RANGE,
            DEATH_ANIM_MS,
            PHASE_COUNTDOWN, PHASE_ARMY_MARCH, PHASE_OPEN_BATTLE,
            PHASE_CASTLE_ASSAULT, PHASE_FINAL_STAND, PHASE_VICTORY } from '/shared/constants.js';
@@ -92,8 +92,13 @@ export class Renderer {
 
     // Environment FX
     this._projLast = new Map(); // projId -> { type, x, y }
+    this._projPrev = new Map(); // projId -> { x, y } (for streak rendering)
     this._craters = []; // { x, y, r, ageMs }
     this._maxCraters = 60;
+
+    // Telegraphing for ranged fire (server events).
+    this._aimLines = []; // { shooterId, tx, ty, targetOnWall, ms, total }
+    this._aimLineMax = 90;
 
     // Sky transition (phase-driven, blended)
     const baseSky = SKY_PALETTES.noon;
@@ -170,6 +175,12 @@ export class Renderer {
       if (this._tracers[i].ms <= 0) this._tracers.splice(i, 1);
     }
 
+    // Aim telegraphs
+    for (let i = this._aimLines.length - 1; i >= 0; i--) {
+      this._aimLines[i].ms -= dtMs;
+      if (this._aimLines[i].ms <= 0) this._aimLines.splice(i, 1);
+    }
+
     // Death FX timers
     for (const [id, ms] of this._deathTimers) {
       const next = ms - dtMs;
@@ -190,8 +201,29 @@ export class Renderer {
 
   _resetMatchFx() {
     this._projLast.clear();
+    this._projPrev.clear();
     this._craters = [];
     this._deathTimers.clear();
+    this._aimLines = [];
+  }
+
+  addAimLine(shooterId, tx, ty, targetOnWall = false, ms = 320) {
+    if (shooterId == null) return;
+    if (!Number.isFinite(tx) || !Number.isFinite(ty)) return;
+
+    const total = Math.max(120, Math.min(900, Math.round(ms || 320)));
+    this._aimLines.push({
+      shooterId,
+      tx,
+      ty,
+      targetOnWall: !!targetOnWall,
+      ms: total,
+      total,
+    });
+
+    if (this._aimLines.length > this._aimLineMax) {
+      this._aimLines.splice(0, this._aimLines.length - this._aimLineMax);
+    }
   }
 
   _setSkyTargetForPhase(phase) {
@@ -351,6 +383,16 @@ export class Renderer {
     const byId = new Map();
     for (const d of drawables) byId.set(d.id, d);
 
+    // Telegraphs (ranged aim)
+    let localTeam = null;
+    for (const d of drawables) {
+      if (d.isLocal) {
+        localTeam = d.team;
+        break;
+      }
+    }
+    this.drawAimLines(byId, localTeam);
+
     // Tracers (ex: hitscan feedback)
     this.drawTracers(byId);
 
@@ -367,15 +409,86 @@ export class Renderer {
     }
 
     // Draw projectiles on top
+    const prevProj = this._projPrev;
+    const nextProj = new Map();
     if (snapshot.projectiles) {
       for (const p of snapshot.projectiles) {
+        const id = p[0];
+        const prev = prevProj.get(id);
+        nextProj.set(id, { x: p[3], y: p[4] });
+
         if (!cam.isOnScreen(p[3])) continue;
-        this.drawProjectile(p);
-	  }
-	}
+        this.drawProjectile(p, prev);
+      }
+    }
+    this._projPrev = nextProj;
 
     this.drawForeground();
     this.drawVignette();
+  }
+
+  drawAimLines(byId, localTeam) {
+    if (this._aimLines.length === 0) return;
+    const ctx = this.ctx;
+    const cam = this.camera;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Animated dash keeps it from looking like another "hitscan tracer".
+    const dash = 7 * cam.scale;
+    ctx.setLineDash([dash, dash]);
+    ctx.lineDashOffset = -this._animTime * 30;
+
+    for (const al of this._aimLines) {
+      const a = byId.get(al.shooterId);
+      if (!a) continue;
+      if (localTeam != null && a.team === localTeam) continue;
+
+      // If both ends are far off screen, skip.
+      if (!cam.isOnScreen(a.x) && !cam.isOnScreen(al.tx)) continue;
+
+      const pa = cam.worldToScreen(a.x, a.y, a.isOnWall);
+      const pt = cam.worldToScreen(al.tx, al.ty, al.targetOnWall);
+
+      const aScale = a.isRoyal ? ROYAL_SCALE : 1;
+      const startY = pa.y - BODY_HEIGHT * cam.scale * aScale * 0.7;
+      const endY = pt.y - BODY_HEIGHT * cam.scale * 0.7;
+
+      const alpha = Math.max(0, Math.min(1, al.ms / (al.total || 1)));
+      const color = a.type === TYPE_GUNNER ? '#ffdd44' : a.type === TYPE_ARCHER ? '#ff8844' : '#ffffff';
+
+      // Glow pass
+      ctx.globalAlpha = 0.10 * alpha;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 7 * cam.scale;
+      ctx.beginPath();
+      ctx.moveTo(pa.x, startY);
+      ctx.lineTo(pt.x, endY);
+      ctx.stroke();
+
+      // Core pass
+      ctx.globalAlpha = 0.55 * alpha;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.0 * cam.scale;
+      ctx.beginPath();
+      ctx.moveTo(pa.x, startY);
+      ctx.lineTo(pt.x, endY);
+      ctx.stroke();
+
+      // Target ping
+      ctx.globalAlpha = 0.40 * alpha;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.lineWidth = 2 * cam.scale;
+      ctx.beginPath();
+      ctx.arc(pt.x, endY, 6.5 * cam.scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 
   drawTracers(byId) {
@@ -831,6 +944,56 @@ export class Renderer {
         }
       }
 
+      // Make melee combat read better: simple swing/thrust trails while in ATTACK.
+      if (!d.isOnWall && d.state === STATE_ATTACK && (weaponType === TYPE_SWORD || weaponType === TYPE_SPEAR)) {
+        const t = (Math.sin(now * 10.5 + d.id * 0.77) * 0.5 + 0.5); // 0..1
+        const alpha = 0.10 + 0.22 * t;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.lineCap = 'round';
+
+        // Glow
+        ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+        ctx.lineWidth = (weaponType === TYPE_SPEAR ? 6 : 7) * cam.scale * scale;
+        ctx.beginPath();
+        if (weaponType === TYPE_SWORD) {
+          const r = 26 * cam.scale * scale;
+          const ang = -1.05 + t * 1.55;
+          const dx = Math.cos(ang) * r * weaponDir;
+          const dy = Math.sin(ang) * r;
+          ctx.moveTo(weaponX, weaponY);
+          ctx.lineTo(weaponX + dx, weaponY + dy);
+        } else {
+          const r = 38 * cam.scale * scale;
+          const wobble = Math.sin(now * 12.0 + d.id * 0.31) * 2.2 * cam.scale * scale;
+          ctx.moveTo(weaponX, weaponY);
+          ctx.lineTo(weaponX + weaponDir * r, weaponY + wobble);
+        }
+        ctx.stroke();
+
+        // Core
+        ctx.globalAlpha = alpha * 2.4;
+        ctx.strokeStyle = '#ffdd44';
+        ctx.lineWidth = (weaponType === TYPE_SPEAR ? 2.3 : 2.8) * cam.scale * scale;
+        ctx.beginPath();
+        if (weaponType === TYPE_SWORD) {
+          const r = 26 * cam.scale * scale;
+          const ang = -1.05 + t * 1.55;
+          const dx = Math.cos(ang) * r * weaponDir;
+          const dy = Math.sin(ang) * r;
+          ctx.moveTo(weaponX, weaponY);
+          ctx.lineTo(weaponX + dx, weaponY + dy);
+        } else {
+          const r = 38 * cam.scale * scale;
+          const wobble = Math.sin(now * 12.0 + d.id * 0.31) * 2.2 * cam.scale * scale;
+          ctx.moveTo(weaponX, weaponY);
+          ctx.lineTo(weaponX + weaponDir * r, weaponY + wobble);
+        }
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
       // Shield (sword+shield only, and big/obvious when blocking)
       if (weaponType === TYPE_SWORD) {
         const shieldX = feetX - weaponDir * torsoW * 0.65;
@@ -967,19 +1130,57 @@ export class Renderer {
     ctx.restore();
   }
 
-  drawProjectile(p) {
+  drawProjectile(p, prev) {
     // p: [id, type, team, x, y, ownerId, dist]
     const ctx = this.ctx;
     const cam = this.camera;
+    const type = p[1];
     const pos = cam.worldToScreen(p[3], p[4], false);
 
+    if (type === PROJ_BULLET) {
+      const prevPos = prev ? cam.worldToScreen(prev.x, prev.y, false) : null;
+
+      ctx.save();
+      ctx.lineCap = 'round';
+
+      const x1 = prevPos ? prevPos.x : (pos.x - 6 * cam.scale);
+      const y1 = prevPos ? prevPos.y : pos.y;
+      const x2 = pos.x;
+      const y2 = pos.y;
+
+      const dist = p[6] || 0;
+      const progress = BULLET_RANGE > 0 ? Math.max(0, Math.min(1, dist / BULLET_RANGE)) : 0;
+      const fade = 1 - 0.55 * progress;
+
+      // Glow
+      ctx.globalAlpha = 0.30 * fade;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 6 * cam.scale;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      // Core
+      ctx.globalAlpha = 0.88 * fade;
+      ctx.strokeStyle = '#ffdd44';
+      ctx.lineWidth = 2.2 * cam.scale;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      ctx.restore();
+      return;
+    }
+
     const dist = p[6] || 0;
-    const maxRange = p[1] === PROJ_ARROW ? ARROW_RANGE : ROCK_RANGE;
+    const maxRange = type === PROJ_ARROW ? ARROW_RANGE : ROCK_RANGE;
     const progress = maxRange > 0 ? Math.max(0, Math.min(1, dist / maxRange)) : 0;
-    const maxArc = (p[1] === PROJ_ARROW ? 35 : 55) * cam.scale;
+    const maxArc = (type === PROJ_ARROW ? 35 : 55) * cam.scale;
     const arc = Math.sin(progress * Math.PI) * maxArc;
 
-    if (p[1] === PROJ_ARROW) {
+    if (type === PROJ_ARROW) {
       const dir = p[2] === TEAM_BLUE ? 1 : -1;
       const y = pos.y - arc;
       ctx.save();

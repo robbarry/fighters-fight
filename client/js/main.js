@@ -22,6 +22,7 @@ const network = new Network();
 const lobby = new Lobby(lobbyDiv);
 const game = new Game(canvas, network);
 const help = new HelpOverlay(helpOverlayEl, helpContentEl);
+let lastLobbyUpdate = null;
 
 function toggleHelp() {
   help.toggle();
@@ -69,6 +70,7 @@ lobby.onReady = (team, role) => {
 
 // Server -> Client handlers
 network.on(MT.MSG_LOBBY_UPDATE, (data) => {
+  lastLobbyUpdate = data;
   lobby.onLobbyUpdate(data);
 });
 
@@ -106,6 +108,7 @@ canvas.addEventListener('click', () => {
     game.reset();
     canvas.style.display = 'none';
     lobby.reset();
+    if (lastLobbyUpdate) lobby.onLobbyUpdate(lastLobbyUpdate);
     lobby.show();
   }
 });
