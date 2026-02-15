@@ -25,6 +25,13 @@ import {
   TARGET_NEAREST_PCT,
   TARGET_RANDOM_PCT,
   ROYAL_SPEED,
+  ROYAL_CHARGE_SPEED_MULT,
+  ROYAL_CHARGE_RANGE,
+  ROYAL_CHARGE_COOLDOWN,
+  ROYAL_CHARGE_DAMAGE_MULT,
+  ROYAL_CLEAVE_RADIUS,
+  ROYAL_TETHER_DIST,
+  ROYAL_TETHER_SOFT,
   FACING_RIGHT,
   FACING_LEFT,
   GROUND_Y_MAX,
@@ -415,96 +422,130 @@ function pickFromPool(soldier, pool) {
 export function updateRoyalAI(royal, enemies, friendlies, dt) {
   const dtMs = dt * 1000;
 
-  // Tether logic: Royals defend their castle, they don't conquer the world.
-  const homeX = royal.team === TEAM_BLUE 
-    ? (BLUE_CASTLE_X + CASTLE_WIDTH / 2) 
-    : (RED_CASTLE_X + CASTLE_WIDTH / 2);
-  const tetherDist = 800;
-
-  // Force retreat if too far from home
-  if (Math.abs(royal.x - homeX) > tetherDist) {
-      // Move towards home
-      const dx = homeX - royal.x;
-      // Facing
-      royal.facing = dx > 0 ? FACING_RIGHT : FACING_LEFT;
-      updateEntityMovement(royal, dx > 0 ? 1 : -1, 0, ROYAL_SPEED * royal.speedMultiplier, dt);
-      return { action: null };
-  }
-
   royal.attackCooldownTimer -= dtMs;
   if (royal.attackCooldownTimer < 0) royal.attackCooldownTimer = 0;
+  if (royal._chargeCooldown == null) royal._chargeCooldown = 0;
+  royal._chargeCooldown -= dtMs;
+  if (royal._chargeCooldown < 0) royal._chargeCooldown = 0;
 
   if (royal.isDead) {
     royal.deathTimer += dtMs;
     return { action: null };
   }
 
-  // Find nearest alive enemy WITHIN TETHER RANGE
-  const alive = enemies.filter(e => !e.isDead && Math.abs(e.x - homeX) < tetherDist + 200);
-  
+  const homeX = royal.team === TEAM_BLUE
+    ? (BLUE_CASTLE_X + CASTLE_WIDTH / 2)
+    : (RED_CASTLE_X + CASTLE_WIDTH / 2);
+
+  // Rubber-band tether: gradual pull toward home instead of hard cutoff
+  const distFromHome = Math.abs(royal.x - homeX);
+  let tetherPullX = 0;
+  if (distFromHome > ROYAL_TETHER_SOFT) {
+    // Strength ramps from 0 at SOFT to full at TETHER_DIST
+    const t = Math.min(1, (distFromHome - ROYAL_TETHER_SOFT) / (ROYAL_TETHER_DIST - ROYAL_TETHER_SOFT));
+    const pullStrength = t * t * 400; // quadratic ramp
+    tetherPullX = (homeX - royal.x) > 0 ? pullStrength : -pullStrength;
+  }
+
+  // Find alive enemies -- all of them, not just within tether range
+  const alive = enemies.filter(e => !e.isDead);
+
   if (alive.length === 0) {
-      // No enemies nearby? Return to patrol point (homeX)
-      if (Math.abs(royal.x - homeX) > 50) {
-          const dx = homeX - royal.x;
-          royal.facing = dx > 0 ? FACING_RIGHT : FACING_LEFT;
-          updateEntityMovement(royal, dx > 0 ? 1 : -1, 0, ROYAL_SPEED * royal.speedMultiplier * 0.5, dt);
-      }
-      return { action: null };
-  }
-
-  let nearest = null;
-  let nearestDist = Infinity;
-  for (const e of alive) {
-    const dx = Math.abs(e.x - royal.x);
-    if (dx < nearestDist) {
-      nearestDist = dx;
-      nearest = e;
-    }
-  }
-
-  if (!nearest) return { action: null };
-
-  royal.target = nearest;
-
-  // Face toward target
-  if (nearest.x > royal.x) royal.facing = FACING_RIGHT;
-  else if (nearest.x < royal.x) royal.facing = FACING_LEFT;
-
-  // If in range, attack
-  const dist = Math.abs(royal.x - nearest.x);
-  if (dist <= royal.attackRange && Math.abs(royal.y - nearest.y) <= 20) {
-    if (royal.attackCooldownTimer <= 0) {
-      const variance = 1 + (Math.random() * 2 - 1) * ATTACK_TIMING_VARIANCE;
-      royal.attackCooldownTimer = royal.attackCooldownBase * variance;
-      return { action: 'melee', target: nearest };
+    // No enemies? Return to patrol point
+    if (Math.abs(royal.x - homeX) > 50) {
+      const dx = homeX - royal.x;
+      royal.facing = dx > 0 ? FACING_RIGHT : FACING_LEFT;
+      updateEntityMovement(royal, dx > 0 ? 1 : -1, 0, ROYAL_SPEED * royal.speedMultiplier * 0.5, dt);
     }
     return { action: null };
   }
 
-  // Move toward target
-  let tdx = nearest.x - royal.x;
-  let tdy = nearest.y - royal.y;
-  
-  // Repulsion from other royals (Don't stack!)
-  if (friendlies) {
-      for (const f of friendlies) {
-          if (f.id === royal.id) continue;
-          if (f.type !== 'king' && f.type !== 'queen') continue;
-          
-          const rdx = royal.x - f.x;
-          const rdy = royal.y - f.y;
-          const rdist = Math.sqrt(rdx*rdx + rdy*rdy);
-          if (rdist < 60 && rdist > 0) {
-              const push = (60 - rdist) * 8.0; 
-              tdx += (rdx / rdist) * push;
-              tdy += (rdy / rdist) * push;
-          }
+  // Target selection: prefer human players, then nearest enemy
+  let target = null;
+  let targetDist = Infinity;
+
+  // First pass: look for human players
+  for (const e of alive) {
+    if (!e.isHuman) continue;
+    const dx = Math.abs(e.x - royal.x);
+    if (dx < targetDist) {
+      targetDist = dx;
+      target = e;
+    }
+  }
+
+  // If no human found or human is very far, pick nearest enemy
+  if (!target || targetDist > ROYAL_CHARGE_RANGE * 2) {
+    target = null;
+    targetDist = Infinity;
+    for (const e of alive) {
+      const dx = Math.abs(e.x - royal.x);
+      if (dx < targetDist) {
+        targetDist = dx;
+        target = e;
       }
+    }
+  }
+
+  if (!target) return { action: null };
+
+  royal.target = target;
+
+  // Face toward target
+  if (target.x > royal.x) royal.facing = FACING_RIGHT;
+  else if (target.x < royal.x) royal.facing = FACING_LEFT;
+
+  // Charge attack: lunge at distant target with AoE cleave
+  if (royal._chargeCooldown <= 0 && targetDist > royal.attackRange * 2 && targetDist <= ROYAL_CHARGE_RANGE) {
+    royal._chargeCooldown = ROYAL_CHARGE_COOLDOWN;
+    return {
+      action: 'charge',
+      target,
+      cleaveRadius: ROYAL_CLEAVE_RADIUS,
+      damageMult: ROYAL_CHARGE_DAMAGE_MULT,
+    };
+  }
+
+  // If in melee range, attack
+  if (targetDist <= royal.attackRange && Math.abs(royal.y - target.y) <= MELEE_Y_FORGIVENESS) {
+    if (royal.attackCooldownTimer <= 0) {
+      const variance = 1 + (Math.random() * 2 - 1) * ATTACK_TIMING_VARIANCE;
+      royal.attackCooldownTimer = royal.attackCooldownBase * variance;
+      return { action: 'melee', target };
+    }
+    return { action: null };
+  }
+
+  // Move toward target with tether pull and royal repulsion
+  let tdx = target.x - royal.x;
+  let tdy = target.y - royal.y;
+
+  // Apply tether pull
+  tdx += tetherPullX * dt;
+
+  // Repulsion from other royals
+  if (friendlies) {
+    for (const f of friendlies) {
+      if (f.id === royal.id) continue;
+      if (f.type !== 'king' && f.type !== 'queen') continue;
+
+      const rdx = royal.x - f.x;
+      const rdy = royal.y - f.y;
+      const rdist = Math.sqrt(rdx * rdx + rdy * rdy);
+      if (rdist < 60 && rdist > 0) {
+        const push = (60 - rdist) * 8.0;
+        tdx += (rdx / rdist) * push;
+        tdy += (rdy / rdist) * push;
+      }
+    }
   }
 
   const tlen = Math.sqrt(tdx * tdx + tdy * tdy);
   if (tlen > 0) {
-    const speed = ROYAL_SPEED * royal.speedMultiplier;
+    // Charging royals are fast enough to catch soldiers
+    const isCharging = royal._chargeCooldown > ROYAL_CHARGE_COOLDOWN - 500;
+    const speedMult = isCharging ? ROYAL_CHARGE_SPEED_MULT : 1.0;
+    const speed = ROYAL_SPEED * royal.speedMultiplier * speedMult;
     updateEntityMovement(royal, tdx / tlen, tdy / tlen, speed, dt);
   }
 

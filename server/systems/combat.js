@@ -6,8 +6,21 @@ import {
   PROJ_ARROW,
   PROJ_ROCK,
   PROJ_BULLET,
+  ROYAL_BOSS_ARMOR,
 } from '../../shared/constants.js';
 import { EVT_HIT } from '../../shared/message-types.js';
+
+function isRoyalEntity(entity) {
+  return entity.type === 'king' || entity.type === 'queen';
+}
+
+// Apply boss armor: AI minions deal reduced damage to royals
+function applyBossArmor(target, attacker, damage) {
+  if (isRoyalEntity(target) && !attacker.isHuman) {
+    return damage * ROYAL_BOSS_ARMOR;
+  }
+  return damage;
+}
 
 function projectileHitRadius(type) {
   // Tune for play feel: bullets should be dodgeable, arrows slightly forgiving, rocks chunky.
@@ -29,14 +42,8 @@ export function checkMeleeHit(attacker, target, range) {
 }
 
 export function processMeleeAttack(attacker, target, damage) {
-  let actualDamage = damage;
+  let actualDamage = applyBossArmor(target, attacker, damage);
   let blocked = false;
-
-  // Boss Armor: Royals take significantly reduced damage from AI minions
-  const isRoyal = target.type === 'king' || target.type === 'queen';
-  if (isRoyal && !attacker.isHuman) {
-    actualDamage *= 0.25;
-  }
 
   if (target.state === STATE_BLOCK) {
     actualDamage *= (1 - SHIELD_BLOCK_REDUCTION);
@@ -89,7 +96,7 @@ export function processHitscan(shooterX, shooterY, aimX, aimY, team, entities, r
   return { entity: closestHit, dist: closestDist };
 }
 
-export function processProjectileCollisions(projectiles, allEntities, spatialHash, events) {
+export function processProjectileCollisions(projectiles, allEntities, spatialHash, events, humanPlayerIds) {
   const hitEvents = [];
 
   for (const proj of projectiles) {
@@ -142,6 +149,11 @@ export function processProjectileCollisions(projectiles, allEntities, spatialHas
         const mult = 1 - (1 - minMult) * t;
         actualDamage = Math.max(1, actualDamage * mult);
       }
+      // Boss armor for projectiles
+      const ownerIsHuman = humanPlayerIds && humanPlayerIds.has(proj.ownerId);
+      if (isRoyalEntity(hitEntity) && !ownerIsHuman) {
+        actualDamage *= ROYAL_BOSS_ARMOR;
+      }
       if (hitEntity.state === STATE_BLOCK) {
         actualDamage *= (1 - SHIELD_BLOCK_REDUCTION);
         blocked = true;
@@ -174,6 +186,10 @@ export function processProjectileCollisions(projectiles, allEntities, spatialHas
           if (Math.sqrt(adx * adx + ady * ady) <= ROCK_AOE_RADIUS) {
             let aoeDamage = proj.damage;
             let aoeBlocked = false;
+            // Boss armor for AOE
+            if (isRoyalEntity(ae) && !ownerIsHuman) {
+              aoeDamage *= ROYAL_BOSS_ARMOR;
+            }
             if (ae.state === STATE_BLOCK) {
               aoeDamage *= (1 - SHIELD_BLOCK_REDUCTION);
               aoeBlocked = true;

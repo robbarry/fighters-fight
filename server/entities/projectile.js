@@ -33,6 +33,7 @@ class Projectile {
       ROCK_RANGE;
     this.targetDist = targetDist > 0 ? targetDist : this.maxRange;
     this.alive = true;
+    this.isHumanOwned = false; // set by caller for player-fired projectiles
   }
 
   update(dt) {

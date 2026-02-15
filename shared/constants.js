@@ -141,12 +141,20 @@ export const TARGET_RANDOM_PCT = 0.20;
 export const TARGET_LOW_HP_PCT = 0.10;
 
 // ─── Royals ──────────────────────────────────────────────
-export const ROYAL_HP = 3000;
+export const ROYAL_HP = 1000;
 export const KING_DAMAGE = 40;
 export const QUEEN_DAMAGE = 35;
 export const KING_COOLDOWN = 700;
 export const QUEEN_COOLDOWN = 600;
-export const ROYAL_SPEED = 85;
+export const ROYAL_SPEED = 160;
+export const ROYAL_CHARGE_SPEED_MULT = 2.5;
+export const ROYAL_CHARGE_RANGE = 300;
+export const ROYAL_CHARGE_COOLDOWN = 4000;
+export const ROYAL_CHARGE_DAMAGE_MULT = 1.5;
+export const ROYAL_CLEAVE_RADIUS = 60;
+export const ROYAL_TETHER_DIST = 800;
+export const ROYAL_TETHER_SOFT = 600; // rubber-band starts here
+export const ROYAL_BOSS_ARMOR = 0.25; // AI damage multiplier vs royals
 
 // ─── Spatial Hash ────────────────────────────────────────
 export const SPATIAL_CELL_SIZE = 100;

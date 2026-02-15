@@ -6,7 +6,8 @@ import { TEAM_BLUE, TEAM_RED, TYPE_SWORD, TYPE_SPEAR, TYPE_ARCHER, TYPE_GUNNER, 
 	         ARROW_RANGE, ROCK_RANGE, BULLET_RANGE,
            DEATH_ANIM_MS,
            PHASE_COUNTDOWN, PHASE_ARMY_MARCH, PHASE_OPEN_BATTLE,
-           PHASE_CASTLE_ASSAULT, PHASE_FINAL_STAND, PHASE_VICTORY } from '/shared/constants.js';
+           PHASE_CASTLE_ASSAULT, PHASE_FINAL_STAND, PHASE_VICTORY,
+           ROYAL_HP } from '/shared/constants.js';
 
 const BLUE_COLOR = '#4488ff';
 const BLUE_DARK = '#2266cc';
@@ -242,7 +243,7 @@ export class Renderer {
         const d = {
           kind: 'royal', id: r[0], type: 'royal', team: r[2],
           x: r[3], y: r[4], hp: r[5], state: r[6], facing: r[7], isOnWall: false,
-          isRoyal: true, isKing: !!r[1], maxHp: 60
+          isRoyal: true, isKing: !!r[1], maxHp: ROYAL_HP
         };
         drawables.push(d);
         entityMap.set(d.id, d);
@@ -397,7 +398,34 @@ export class Renderer {
     }
 
     // 8. Health Bar
-    if (d.hp < d.maxHp) {
+    if (d.isRoyal) {
+        // Boss-style health bar: always visible, wider, with label
+        const barW = 50;
+        const barH = 6;
+        const barY = -48;
+        const hpPct = Math.max(0, d.hp / ROYAL_HP);
+        const barColor = hpPct > 0.5 ? '#4CAF50' : hpPct > 0.25 ? '#FFC107' : '#F44336';
+
+        // Background
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(-barW / 2 - 1, barY - 1, barW + 2, barH + 2);
+
+        // HP fill
+        ctx.fillStyle = barColor;
+        ctx.fillRect(-barW / 2, barY, barW * hpPct, barH);
+
+        // Border
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-barW / 2 - 1, barY - 1, barW + 2, barH + 2);
+
+        // Label
+        const label = d.isKing ? 'KING' : 'QUEEN';
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, 0, barY - 4);
+    } else if (d.hp < d.maxHp) {
         ctx.fillStyle = '#333';
         ctx.fillRect(-10, -40, 20, 4);
         ctx.fillStyle = d.hp / d.maxHp > 0.5 ? '#4CAF50' : '#F44336';

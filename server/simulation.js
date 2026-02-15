@@ -68,6 +68,7 @@ import {
   GATE_BULLET_DAMAGE,
   GATE_HIT_DIST,
   SHIELD_BLOCK_REDUCTION,
+  ROYAL_BOSS_ARMOR,
   ROCK_AOE_RADIUS,
 } from '../shared/constants.js';
 import {
@@ -313,6 +314,11 @@ class Simulation {
           const target = hit.entity;
           let dmg = soldier.damage;
           let blocked = false;
+          // Boss armor: AI hitscan vs royals
+          const isRoyal = target.type === 'king' || target.type === 'queen';
+          if (isRoyal && !soldier.isHuman) {
+            dmg *= ROYAL_BOSS_ARMOR;
+          }
           if (target.state === STATE_BLOCK) {
              dmg *= (1 - SHIELD_BLOCK_REDUCTION);
              blocked = true;
@@ -371,6 +377,43 @@ class Simulation {
             this._handleEntityDeath(result.target);
           }
         }
+      } else if (result.action === 'charge' && result.target) {
+        // Charge: lunge toward target, then AoE cleave
+        const tx = result.target.x;
+        const ty = result.target.y;
+        const dx = tx - royal.x;
+        const dist = Math.abs(dx);
+
+        // Instantly move royal close to target (lunge)
+        if (dist > royal.attackRange) {
+          const moveDir = dx > 0 ? 1 : -1;
+          royal.x = tx - moveDir * (royal.attackRange * 0.8);
+          royal.y = ty;
+        }
+
+        // AoE cleave: hit all enemies within cleave radius
+        const cleaveR = result.cleaveRadius;
+        const chargeDmg = royal.damage * result.damageMult;
+        for (const e of enemies) {
+          if (e.isDead) continue;
+          const edx = e.x - royal.x;
+          const edy = e.y - royal.y;
+          if (Math.sqrt(edx * edx + edy * edy) <= cleaveR) {
+            const res = processMeleeAttack(royal, e, chargeDmg);
+            this.events.push({
+              tick: this.tick,
+              e: EVT_HIT,
+              attackerId: royal.id,
+              victimId: e.id,
+              dmg: Math.round(res.damage),
+              x: Math.round(e.x),
+              y: Math.round(e.y),
+            });
+            if (e.isDead) {
+              this._handleEntityDeath(e);
+            }
+          }
+        }
       }
     }
 
@@ -423,8 +466,9 @@ class Simulation {
       ...this.players.filter(p => !p.isDead && p.state !== STATE_RESPAWNING && p.state !== STATE_SPECTATING),
       ...this.royals.filter(r => !r.isDead),
     ];
+    const humanPlayerIds = new Set(this.players.map(p => p.id));
     const hitEvents = processProjectileCollisions(
-      this.projectiles, allAlive, this.spatialHash, this.events
+      this.projectiles, allAlive, this.spatialHash, this.events, humanPlayerIds
     );
     for (const evt of hitEvents) {
       evt.tick = this.tick;
