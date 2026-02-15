@@ -62,9 +62,7 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
   }
 
   // Movement
-  const { dx, dy, atk, blk, spc, aimX, aimY: rawAimY } = player.input;
-  // Clamp aimY to play area to prevent shooting into the void (sky aiming)
-  const aimY = Math.max(0, Math.min(GROUND_Y_MAX, rawAimY));
+  const { dx, dy, atk, blk, spc, aimX, aimY } = player.input;
 
   if (player.isOnWall) {
     // Keep wall roles pinned to the battlements lane.
