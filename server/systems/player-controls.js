@@ -168,7 +168,7 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
   }
 
   // Attack
-  if (player.role === TYPE_CATAPULT) {
+  if (player.role === TYPE_CATAPULT && player.state !== STATE_BLOCK) {
     const ready = player.attackCooldownTimer <= 0;
 
     if (!ready) {
@@ -215,7 +215,7 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
     }
 
     player._prevAtk = atk;
-  } else if (atk && player.attackCooldownTimer <= 0) {
+  } else if (atk && player.attackCooldownTimer <= 0 && player.state !== STATE_BLOCK) {
     const variance = 1 + (Math.random() * 2 - 1) * ATTACK_TIMING_VARIANCE;
     player.attackCooldownTimer = player.attackCooldownBase * variance;
 

@@ -587,11 +587,11 @@ class Simulation {
       const defendingTeam = this._getLosingTeam();
       if (defendingTeam !== null) {
           const attackingTeam = defendingTeam === TEAM_BLUE ? TEAM_RED : TEAM_BLUE;
+          const attackerSoldiers = this.armyManager.getAliveCount(attackingTeam);
           const attackers = this.players.filter(p => p.team === attackingTeam);
-          // If there are attackers, but all are out of lives (spectating), Defenders win.
-          if (attackers.length > 0) {
-             const activeAttackers = attackers.filter(p => p.state !== STATE_SPECTATING);
-             if (activeAttackers.length === 0) {
+          const activeAttackers = attackers.filter(p => p.state !== STATE_SPECTATING);
+          // Defenders win when the attacking army is wiped AND all attacking players are out of lives.
+          if (attackerSoldiers === 0 && activeAttackers.length === 0) {
                  this.phase = PHASE_VICTORY;
                  this.winner = defendingTeam;
                  this.events.push({
@@ -599,7 +599,6 @@ class Simulation {
                     e: EVT_GAMEOVER,
                     winner: this.winner,
                  });
-             }
           }
       }
     }

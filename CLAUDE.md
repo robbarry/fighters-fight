@@ -59,7 +59,7 @@ Messages use integer type field `t`. Snapshots contain compact arrays:
 - soldiers: `[id, type, team, x, y, hp, state, facing, isOnWall]`
 - players: `[id, role, team, x, y, hp, state, facing, lives, isOnWall, controlsRoyalId]`
 - royals: `[id, isKing, team, x, y, hp, state, facing]`
-- projectiles: `[id, type, team, x, y, ownerId, dist]`
+- projectiles: `[id, type, team, x, y, ownerId, dist, targetDist]`
 - gates: `[blueGateHp, redGateHp]`
 
 All enums (type, team, state, facing, phase) are small integers defined in `shared/constants.js`.
