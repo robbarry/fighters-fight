@@ -399,7 +399,11 @@ export class Renderer {
 
     // 8. Health Bar
     if (d.isRoyal) {
-        // Boss-style health bar: always visible, wider, with label
+        // Counter-flip so bar and text always read left-to-right
+        const dir2 = d.facing === 1 ? -1 : 1;
+        ctx.save();
+        ctx.scale(dir2, 1);
+
         const barW = 50;
         const barH = 6;
         const barY = -48;
@@ -425,6 +429,8 @@ export class Renderer {
         ctx.font = 'bold 8px monospace';
         ctx.textAlign = 'center';
         ctx.fillText(label, 0, barY - 4);
+
+        ctx.restore();
     } else if (d.hp < d.maxHp) {
         ctx.fillStyle = '#333';
         ctx.fillRect(-10, -40, 20, 4);
