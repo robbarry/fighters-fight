@@ -409,7 +409,7 @@ function pickFromPool(soldier, pool) {
   }
 }
 
-export function updateRoyalAI(royal, enemies, dt) {
+export function updateRoyalAI(royal, enemies, friendlies, dt) {
   const dtMs = dt * 1000;
 
   royal.attackCooldownTimer -= dtMs;
@@ -454,8 +454,27 @@ export function updateRoyalAI(royal, enemies, dt) {
   }
 
   // Move toward target
-  const tdx = nearest.x - royal.x;
-  const tdy = nearest.y - royal.y;
+  let tdx = nearest.x - royal.x;
+  let tdy = nearest.y - royal.y;
+  
+  // Repulsion from other royals (Don't stack!)
+  if (friendlies) {
+      for (const f of friendlies) {
+          if (f.id === royal.id) continue;
+          // Check if it's a Royal (using type string 'king'/'queen' or class check if available, but type is safer here)
+          if (f.type !== 'king' && f.type !== 'queen') continue;
+          
+          const rdx = royal.x - f.x;
+          const rdy = royal.y - f.y;
+          const rdist = Math.sqrt(rdx*rdx + rdy*rdy);
+          if (rdist < 60 && rdist > 0) {
+              const push = (60 - rdist) * 8.0; // Strong repulsion
+              tdx += (rdx / rdist) * push;
+              tdy += (rdy / rdist) * push;
+          }
+      }
+  }
+
   const tlen = Math.sqrt(tdx * tdx + tdy * tdy);
   if (tlen > 0) {
     const speed = ROYAL_SPEED * royal.speedMultiplier;

@@ -350,7 +350,8 @@ class Simulation {
       if (royal.isDead || royal.isHumanControlled) continue;
 
       const enemies = royal.team === TEAM_BLUE ? redEntities : blueEntities;
-      const result = updateRoyalAI(royal, enemies, dt);
+      const friendlies = royal.team === TEAM_BLUE ? blueEntities : redEntities;
+      const result = updateRoyalAI(royal, enemies, friendlies, dt);
 
       if (result.action === 'melee' && result.target) {
         if (checkMeleeHit(royal, result.target, royal.attackRange)) {
