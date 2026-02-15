@@ -141,9 +141,9 @@ export const TARGET_RANDOM_PCT = 0.20;
 export const TARGET_LOW_HP_PCT = 0.10;
 
 // ─── Royals ──────────────────────────────────────────────
-export const ROYAL_HP = 200;
-export const KING_DAMAGE = 12;
-export const QUEEN_DAMAGE = 10;
+export const ROYAL_HP = 1000;
+export const KING_DAMAGE = 25;
+export const QUEEN_DAMAGE = 22;
 export const KING_COOLDOWN = 700;
 export const QUEEN_COOLDOWN = 600;
 export const ROYAL_SPEED = 85;
@@ -159,3 +159,5 @@ export const ROYAL_SCALE = 1.5;
 
 // ─── Gate ────────────────────────────────────────────────
 export const GATE_HIT_DIST = 40;
+export const GATE_ARROW_DAMAGE = 2;
+export const GATE_BULLET_DAMAGE = 2;
