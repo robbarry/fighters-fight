@@ -62,7 +62,9 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
   }
 
   // Movement
-  const { dx, dy, atk, blk, spc, aimX, aimY } = player.input;
+  const { dx, dy, atk, blk, spc, aimX, aimY: rawAimY } = player.input;
+  // Clamp aimY to play area so projectiles land on the battlefield
+  const aimY = Math.max(0, Math.min(GROUND_Y_MAX, rawAimY));
 
   if (player.isOnWall) {
     // Keep wall roles pinned to the battlements lane.
