@@ -28,6 +28,10 @@ import {
   ABILITY_COOLDOWN_GUNNER,
   ABILITY_COOLDOWN_CATAPULT,
   PLAYER_SPEED,
+  GATE_HIT_DIST,
+  BLUE_CASTLE_X,
+  RED_CASTLE_X,
+  CASTLE_WIDTH,
 } from '../../shared/constants.js';
 import {
   EVT_HIT,
@@ -36,7 +40,7 @@ import {
 } from '../../shared/message-types.js';
 import Projectile from '../entities/projectile.js';
 import { updateEntityMovement } from './physics.js';
-import { checkMeleeHit, processMeleeAttack } from './combat.js';
+import { checkMeleeHit, processMeleeAttack, checkGateDamage } from './combat.js';
 
 export function updatePlayer(player, dt, blueEntities, redEntities, simulation) {
   const dtMs = dt * 1000;
@@ -234,6 +238,15 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
         });
         if (bestTarget.isDead) {
           simulation._handleEntityDeath(bestTarget);
+        }
+      } else {
+        // No enemy found? Check gate!
+        const enemyGateX = player.team === TEAM_BLUE ? RED_CASTLE_X : (BLUE_CASTLE_X + CASTLE_WIDTH);
+        if (checkGateDamage(player, enemyGateX, GATE_HIT_DIST)) {
+           const targetTeam = player.team === TEAM_BLUE ? TEAM_RED : TEAM_BLUE;
+           simulation.castleManager.takeDamage(targetTeam, player.damage);
+           // Add visual feedback for gate hit if needed (e.g., particles)
+           // For now, gate HP updates directly.
         }
       }
     } else if (player.role === TYPE_ARCHER) {

@@ -4,12 +4,12 @@ import { PHASE_COUNTDOWN, PHASE_VICTORY, PHASE_ARMY_MARCH, PHASE_OPEN_BATTLE,
 		         TYPE_GUNNER, TYPE_CATAPULT, CATAPULT_CHARGE_MS,
 		         BLUE_CASTLE_X, RED_CASTLE_X, CASTLE_WIDTH } from '/shared/constants.js';
 import * as MT from '/shared/message-types.js';
-import { Renderer } from './renderer-new.js';
+import { Renderer } from './renderer.js';
 import { Camera } from './camera.js';
 import { Input } from './input.js';
 import { Interpolation } from './interpolation.js';
 import { HUD } from './hud.js';
-import { ParticleSystem } from './particles-new.js';
+import { ParticleSystem } from './particles.js';
 import { roleName } from './roles.js';
 
 const SHOUT_TEXTS = ['I need help!', "Let's go!", 'Hi!', 'FIRING!', 'Throwing spears!'];
