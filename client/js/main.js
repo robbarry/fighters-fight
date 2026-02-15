@@ -118,8 +118,11 @@ canvas.addEventListener('click', () => {
 network.setDisconnectHandler(() => {
   document.body.innerHTML = '<div style="color:white;text-align:center;padding-top:20%;font-family:sans-serif;"><h1>Disconnected</h1><p>Please refresh the page to reconnect.</p></div>';
 });
+network.onLog = (msg) => {
+  if (lobby && lobby.log) lobby.log(msg);
+};
 network.onConnect = () => {
-  if (lobby.log) lobby.log('Connected to server');
+  if (lobby && lobby.log) lobby.log('Connected to server');
 };
 network.connect();
 lobby.show();
