@@ -92,7 +92,7 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
   }
 
   // Special Ability
-  if (spc && player.specialCooldownTimer <= 0) {
+  if (spc && player.specialCooldownTimer <= 0 && player.state !== STATE_BLOCK) {
     // Note: enemies list depends on team
     const enemies = player.team === TEAM_BLUE ? redEntities : blueEntities;
     

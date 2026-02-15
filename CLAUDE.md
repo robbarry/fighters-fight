@@ -10,7 +10,7 @@ Two-player castle siege battle game. Two armies of 140 AI soldiers charge across
 
 ```bash
 npm start              # Start server on :3000 (or PORT env)
-node --test test/      # Run unit tests (node:test, no framework)
+node --test            # Run unit tests (node:test, no framework)
 ```
 
 No build step, no linter, no TypeScript. The only dependency is `ws`.
