@@ -122,22 +122,12 @@ export class Camera {
     const ux = sx - this.shakeX;
     const uy = sy - this.shakeY;
 
-    // Robust Aiming Logic:
-    // The screen is divided into two "aiming zones" by the horizon (groundScreenY).
-    // Zone A: Above Horizon (Sky/Castle/Walls).
-    //         - Maps to World Y = 30 (The "Wall Lane").
-    //         - This allows intuitive clicking on wall units to target them.
-    // Zone B: Below Horizon (Ground).
-    //         - Maps to World Y = 0..60 based on screen depth.
-    //         - This allows precise targeting of ground units.
-
-    let wy;
-    if (uy < this.groundScreenY) {
-      wy = 30; // Snap to Wall Lane height
-    } else {
-      const t = (uy - this.groundScreenY) / this.groundBandHeight;
-      wy = Math.max(0, Math.min(GROUND_Y_MAX, t * GROUND_Y_MAX));
-    }
+    // Linear mapping allowing aiming above/below horizon.
+    // uy at groundScreenY => wy = 0.
+    // uy above groundScreenY => wy < 0 (Sky).
+    // uy below groundScreenY => wy > 0 (Ground).
+    const t = (uy - this.groundScreenY) / this.groundBandHeight;
+    const wy = t * GROUND_Y_MAX;
 
     const wx = ux / this.scale + this.x;
     return { x: wx, y: wy };

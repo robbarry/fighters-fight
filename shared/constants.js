@@ -141,9 +141,9 @@ export const TARGET_RANDOM_PCT = 0.20;
 export const TARGET_LOW_HP_PCT = 0.10;
 
 // ─── Royals ──────────────────────────────────────────────
-export const ROYAL_HP = 1000;
-export const KING_DAMAGE = 25;
-export const QUEEN_DAMAGE = 22;
+export const ROYAL_HP = 8000;
+export const KING_DAMAGE = 40;
+export const QUEEN_DAMAGE = 35;
 export const KING_COOLDOWN = 700;
 export const QUEEN_COOLDOWN = 600;
 export const ROYAL_SPEED = 85;

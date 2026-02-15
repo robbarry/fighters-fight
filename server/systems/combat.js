@@ -31,6 +31,13 @@ export function checkMeleeHit(attacker, target, range) {
 export function processMeleeAttack(attacker, target, damage) {
   let actualDamage = damage;
   let blocked = false;
+
+  // Boss Armor: Royals take significantly reduced damage from AI minions
+  const isRoyal = target.type === 'king' || target.type === 'queen';
+  if (isRoyal && !attacker.isHuman) {
+    actualDamage *= 0.25;
+  }
+
   if (target.state === STATE_BLOCK) {
     actualDamage *= (1 - SHIELD_BLOCK_REDUCTION);
     blocked = true;
