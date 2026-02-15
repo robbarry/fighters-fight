@@ -97,6 +97,19 @@ export class Lobby {
     };
     status.appendChild(this.readyBtn);
 
+    // Solo Button
+    this.soloBtn = document.createElement('button');
+    this.soloBtn.className = 'ready-btn solo-btn';
+    this.soloBtn.textContent = 'PLAY SOLO';
+    this.soloBtn.style.marginLeft = '20px';
+    this.soloBtn.style.background = '#8844ff';
+    this.soloBtn.disabled = true;
+    this.soloBtn.onclick = () => {
+      if (this.selectedTeam === null) return;
+      if (this.onSolo) this.onSolo(this.selectedTeam, this.selectedRole);
+    };
+    status.appendChild(this.soloBtn);
+
     this.statusText = document.createElement('div');
     this.statusText.className = 'status-text';
     this.statusText.textContent = 'Select a team to start';
@@ -128,6 +141,7 @@ export class Lobby {
   updateReadyBtn() {
     if (this.ready) return;
     this.readyBtn.disabled = this.selectedTeam === null;
+    this.soloBtn.disabled = this.selectedTeam === null;
     if (this.selectedTeam !== null) {
       this.statusText.textContent = "Click READY when you're set!";
     }

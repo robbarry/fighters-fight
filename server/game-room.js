@@ -20,6 +20,7 @@ import {
   MSG_SHOUT,
   EVT_SHOUT,
   MSG_COUNTDOWN,
+  MSG_START_SOLO,
 } from '../shared/message-types.js';
 
 class GameRoom {
@@ -104,6 +105,13 @@ class GameRoom {
         }
         break;
 
+      case MSG_START_SOLO:
+        if (this.gameInProgress) break;
+        client.ready = true;
+        console.log(`Player ${socketId} starting SOLO (team=${client.team}, role=${client.role})`);
+        this._startGame();
+        break;
+
       case MSG_INPUT:
         if (this.gameInProgress) {
           const player = this.simulation.getPlayerBySocketId(socketId);
@@ -145,6 +153,12 @@ class GameRoom {
     const randomEntries = entries.filter(([, c]) => c.team === -1);
     const fixedEntries = entries.filter(([, c]) => c.team !== -1);
 
+    if (entries.length === 1 && entries[0][1].team === -1) {
+       // Single player random: assign random team
+       entries[0][1].team = Math.random() < 0.5 ? TEAM_BLUE : TEAM_RED;
+       return;
+    }
+
     if (randomEntries.length === 2) {
       // Both random: assign one to each team
       const shuffled = Math.random() < 0.5 ? [TEAM_BLUE, TEAM_RED] : [TEAM_RED, TEAM_BLUE];
@@ -165,6 +179,7 @@ class GameRoom {
     this._resolveTeams();
 
     const entries = [...this.clients.entries()];
+    console.log(`Starting game with ${entries.length} player(s).`);
 
     // Add players first
     const playerMap = new Map(); // socketId -> player

@@ -68,6 +68,12 @@ lobby.onReady = (team, role) => {
   network.send({ t: MT.MSG_READY });
 };
 
+lobby.onSolo = (team, role) => {
+  network.send({ t: MT.MSG_TEAM_SELECT, team });
+  network.send({ t: MT.MSG_ROLE_SELECT, role });
+  network.send({ t: MT.MSG_START_SOLO });
+};
+
 // Server -> Client handlers
 network.on(MT.MSG_LOBBY_UPDATE, (data) => {
   if (lobby.log) lobby.log(`Rx Lobby Update (SocketID: ${data.socketId})`);

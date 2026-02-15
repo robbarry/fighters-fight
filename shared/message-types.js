@@ -12,6 +12,7 @@ export const MSG_ROLE_SELECT = 12;
 export const MSG_READY = 13;
 export const MSG_INPUT = 14;
 export const MSG_SHOUT = 15;
+export const MSG_START_SOLO = 16;
 
 // ─── Event Subtypes ──────────────────────────────────────
 export const EVT_DEATH = 0;
