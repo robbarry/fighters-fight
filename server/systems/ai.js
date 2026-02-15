@@ -437,21 +437,56 @@ export function updateRoyalAI(royal, enemies, friendlies, dt) {
     ? (BLUE_CASTLE_X + CASTLE_WIDTH / 2)
     : (RED_CASTLE_X + CASTLE_WIDTH / 2);
 
+  // --- Active charge dash (multi-tick) ---
+  if (royal._chargeTarget) {
+    const ct = royal._chargeTarget;
+    // If target died or we've been dashing too long, abort
+    royal._chargeTicks = (royal._chargeTicks || 0) + 1;
+    if (ct.isDead || royal._chargeTicks > 20) {
+      royal._chargeTarget = null;
+      royal._chargeTicks = 0;
+      return { action: null };
+    }
+
+    // Dash toward target at charge speed
+    const cdx = ct.x - royal.x;
+    const cdy = ct.y - royal.y;
+    const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
+
+    if (cdist <= royal.attackRange + 10) {
+      // Arrived -- do the AoE cleave
+      royal._chargeTarget = null;
+      royal._chargeTicks = 0;
+      return {
+        action: 'charge_cleave',
+        cleaveRadius: ROYAL_CLEAVE_RADIUS,
+        damageMult: ROYAL_CHARGE_DAMAGE_MULT,
+      };
+    }
+
+    // Face and dash toward target
+    royal.facing = cdx > 0 ? FACING_RIGHT : FACING_LEFT;
+    const dashSpeed = ROYAL_SPEED * ROYAL_CHARGE_SPEED_MULT;
+    if (cdist > 0) {
+      updateEntityMovement(royal, cdx / cdist, cdy / cdist, dashSpeed, dt);
+    }
+    return { action: null };
+  }
+
+  // --- Normal AI ---
+
   // Rubber-band tether: gradual pull toward home instead of hard cutoff
   const distFromHome = Math.abs(royal.x - homeX);
   let tetherPullX = 0;
   if (distFromHome > ROYAL_TETHER_SOFT) {
-    // Strength ramps from 0 at SOFT to full at TETHER_DIST
     const t = Math.min(1, (distFromHome - ROYAL_TETHER_SOFT) / (ROYAL_TETHER_DIST - ROYAL_TETHER_SOFT));
-    const pullStrength = t * t * 400; // quadratic ramp
+    const pullStrength = t * t * 400;
     tetherPullX = (homeX - royal.x) > 0 ? pullStrength : -pullStrength;
   }
 
-  // Find alive enemies -- all of them, not just within tether range
   const alive = enemies.filter(e => !e.isDead);
 
   if (alive.length === 0) {
-    // No enemies? Return to patrol point
     if (Math.abs(royal.x - homeX) > 50) {
       const dx = homeX - royal.x;
       royal.facing = dx > 0 ? FACING_RIGHT : FACING_LEFT;
@@ -464,7 +499,6 @@ export function updateRoyalAI(royal, enemies, friendlies, dt) {
   let target = null;
   let targetDist = Infinity;
 
-  // First pass: look for human players
   for (const e of alive) {
     if (!e.isHuman) continue;
     const dx = Math.abs(e.x - royal.x);
@@ -474,7 +508,6 @@ export function updateRoyalAI(royal, enemies, friendlies, dt) {
     }
   }
 
-  // If no human found or human is very far, pick nearest enemy
   if (!target || targetDist > ROYAL_CHARGE_RANGE * 2) {
     target = null;
     targetDist = Infinity;
@@ -491,22 +524,18 @@ export function updateRoyalAI(royal, enemies, friendlies, dt) {
 
   royal.target = target;
 
-  // Face toward target
   if (target.x > royal.x) royal.facing = FACING_RIGHT;
   else if (target.x < royal.x) royal.facing = FACING_LEFT;
 
-  // Charge attack: lunge at distant target with AoE cleave
+  // Initiate charge dash: sets target, plays out over subsequent ticks
   if (royal._chargeCooldown <= 0 && targetDist > royal.attackRange * 2 && targetDist <= ROYAL_CHARGE_RANGE) {
     royal._chargeCooldown = ROYAL_CHARGE_COOLDOWN;
-    return {
-      action: 'charge',
-      target,
-      cleaveRadius: ROYAL_CLEAVE_RADIUS,
-      damageMult: ROYAL_CHARGE_DAMAGE_MULT,
-    };
+    royal._chargeTarget = target;
+    royal._chargeTicks = 0;
+    return { action: null }; // dash begins next tick
   }
 
-  // If in melee range, attack
+  // Melee attack
   if (targetDist <= royal.attackRange && Math.abs(royal.y - target.y) <= MELEE_Y_FORGIVENESS) {
     if (royal.attackCooldownTimer <= 0) {
       const variance = 1 + (Math.random() * 2 - 1) * ATTACK_TIMING_VARIANCE;
@@ -520,10 +549,8 @@ export function updateRoyalAI(royal, enemies, friendlies, dt) {
   let tdx = target.x - royal.x;
   let tdy = target.y - royal.y;
 
-  // Apply tether pull
   tdx += tetherPullX * dt;
 
-  // Repulsion from other royals
   if (friendlies) {
     for (const f of friendlies) {
       if (f.id === royal.id) continue;
@@ -542,10 +569,7 @@ export function updateRoyalAI(royal, enemies, friendlies, dt) {
 
   const tlen = Math.sqrt(tdx * tdx + tdy * tdy);
   if (tlen > 0) {
-    // Charging royals are fast enough to catch soldiers
-    const isCharging = royal._chargeCooldown > ROYAL_CHARGE_COOLDOWN - 500;
-    const speedMult = isCharging ? ROYAL_CHARGE_SPEED_MULT : 1.0;
-    const speed = ROYAL_SPEED * royal.speedMultiplier * speedMult;
+    const speed = ROYAL_SPEED * royal.speedMultiplier;
     updateEntityMovement(royal, tdx / tlen, tdy / tlen, speed, dt);
   }
 

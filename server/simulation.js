@@ -377,21 +377,8 @@ class Simulation {
             this._handleEntityDeath(result.target);
           }
         }
-      } else if (result.action === 'charge' && result.target) {
-        // Charge: lunge toward target, then AoE cleave
-        const tx = result.target.x;
-        const ty = result.target.y;
-        const dx = tx - royal.x;
-        const dist = Math.abs(dx);
-
-        // Instantly move royal close to target (lunge)
-        if (dist > royal.attackRange) {
-          const moveDir = dx > 0 ? 1 : -1;
-          royal.x = tx - moveDir * (royal.attackRange * 0.8);
-          royal.y = ty;
-        }
-
-        // AoE cleave: hit all enemies within cleave radius
+      } else if (result.action === 'charge_cleave') {
+        // AoE cleave at end of charge dash
         const cleaveR = result.cleaveRadius;
         const chargeDmg = royal.damage * result.damageMult;
         for (const e of enemies) {
