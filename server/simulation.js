@@ -64,6 +64,9 @@ import {
   ABILITY_COOLDOWN_ARCHER,
   ABILITY_COOLDOWN_GUNNER,
   ABILITY_COOLDOWN_CATAPULT,
+  GATE_ARROW_DAMAGE,
+  GATE_BULLET_DAMAGE,
+  GATE_HIT_DIST,
 } from '../shared/constants.js';
 import {
   EVT_DEATH,
@@ -429,15 +432,23 @@ class Simulation {
         this._handleEntityDeath(victim);
       }
     }
-    // Rock projectiles damage gates
+    // Projectiles damage gates
     for (const proj of this.projectiles) {
-      if (!proj.alive || proj.type !== PROJ_ROCK) continue;
-      // Check if rock hit either gate
-      if (proj.team === TEAM_BLUE && Math.abs(proj.x - RED_GATE_X) < 30) {
-        this.castleManager.takeDamage(TEAM_RED, proj.damage);
+      if (!proj.alive) continue;
+
+      let dmg = 0;
+      if (proj.type === PROJ_ROCK) dmg = proj.damage;
+      else if (proj.type === PROJ_ARROW) dmg = GATE_ARROW_DAMAGE;
+      else if (proj.type === PROJ_BULLET) dmg = GATE_BULLET_DAMAGE;
+
+      if (dmg <= 0) continue;
+
+      // Check if hit either gate
+      if (proj.team === TEAM_BLUE && Math.abs(proj.x - RED_GATE_X) < GATE_HIT_DIST) {
+        this.castleManager.takeDamage(TEAM_RED, dmg);
         proj.alive = false;
-      } else if (proj.team === TEAM_RED && Math.abs(proj.x - BLUE_GATE_X) < 30) {
-        this.castleManager.takeDamage(TEAM_BLUE, proj.damage);
+      } else if (proj.team === TEAM_RED && Math.abs(proj.x - BLUE_GATE_X) < GATE_HIT_DIST) {
+        this.castleManager.takeDamage(TEAM_BLUE, dmg);
         proj.alive = false;
       }
     }
