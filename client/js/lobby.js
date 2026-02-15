@@ -106,6 +106,23 @@ export class Lobby {
     this.otherPlayerInfo.className = 'other-player-info';
     this.otherPlayerInfo.style.display = 'none';
     status.appendChild(this.otherPlayerInfo);
+
+    // Debug footer
+    this.debugLog = document.createElement('div');
+    this.debugLog.style.cssText = 'position:fixed; bottom:5px; right:5px; font-size:10px; color:#666; font-family:monospace; pointer-events:none; text-align:right;';
+    c.appendChild(this.debugLog);
+    this.log('Lobby UI ready');
+  }
+
+  log(msg) {
+    if (!this.debugLog) return;
+    const line = document.createElement('div');
+    line.textContent = msg;
+    this.debugLog.appendChild(line);
+    // Keep last 5 lines
+    while (this.debugLog.children.length > 8) {
+      this.debugLog.removeChild(this.debugLog.firstChild);
+    }
   }
 
   updateReadyBtn() {

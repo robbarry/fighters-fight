@@ -70,6 +70,7 @@ lobby.onReady = (team, role) => {
 
 // Server -> Client handlers
 network.on(MT.MSG_LOBBY_UPDATE, (data) => {
+  if (lobby.log) lobby.log(`Rx Lobby Update (SocketID: ${data.socketId})`);
   lastLobbyUpdate = data;
   lobby.onLobbyUpdate(data);
 });
@@ -117,5 +118,8 @@ canvas.addEventListener('click', () => {
 network.setDisconnectHandler(() => {
   document.body.innerHTML = '<div style="color:white;text-align:center;padding-top:20%;font-family:sans-serif;"><h1>Disconnected</h1><p>Please refresh the page to reconnect.</p></div>';
 });
+network.onConnect = () => {
+  if (lobby.log) lobby.log('Connected to server');
+};
 network.connect();
 lobby.show();
