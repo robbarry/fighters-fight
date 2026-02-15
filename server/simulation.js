@@ -559,18 +559,42 @@ class Simulation {
     }
 
     // Check victory in FINAL_STAND
-    if (this.phase === PHASE_FINAL_STAND && this.royals.length > 0) {
-      const losingTeamRoyals = this.royals.filter(r => !r.isDead);
-      if (losingTeamRoyals.length === 0) {
-        this.phase = PHASE_VICTORY;
-        // Winner is the team that is NOT the losing team
-        const losingTeam = this.royals[0].team;
-        this.winner = losingTeam === TEAM_BLUE ? TEAM_RED : TEAM_BLUE;
-        this.events.push({
-          tick: this.tick,
-          e: EVT_GAMEOVER,
-          winner: this.winner,
-        });
+    if (this.phase === PHASE_FINAL_STAND) {
+      if (this.royals.length > 0) {
+        // Condition 1: Attackers Win (Royals dead)
+        const losingTeamRoyals = this.royals.filter(r => !r.isDead);
+        if (losingTeamRoyals.length === 0) {
+          this.phase = PHASE_VICTORY;
+          // Winner is the team that is NOT the losing team
+          const losingTeam = this.royals[0].team;
+          this.winner = losingTeam === TEAM_BLUE ? TEAM_RED : TEAM_BLUE;
+          this.events.push({
+            tick: this.tick,
+            e: EVT_GAMEOVER,
+            winner: this.winner,
+          });
+          return; // Stop processing
+        }
+      }
+
+      // Condition 2: Defenders Win (Attackers wiped out)
+      const defendingTeam = this._getLosingTeam();
+      if (defendingTeam !== null) {
+          const attackingTeam = defendingTeam === TEAM_BLUE ? TEAM_RED : TEAM_BLUE;
+          const attackers = this.players.filter(p => p.team === attackingTeam);
+          // If there are attackers, but all are out of lives (spectating), Defenders win.
+          if (attackers.length > 0) {
+             const activeAttackers = attackers.filter(p => p.state !== STATE_SPECTATING);
+             if (activeAttackers.length === 0) {
+                 this.phase = PHASE_VICTORY;
+                 this.winner = defendingTeam;
+                 this.events.push({
+                    tick: this.tick,
+                    e: EVT_GAMEOVER,
+                    winner: this.winner,
+                 });
+             }
+          }
       }
     }
 

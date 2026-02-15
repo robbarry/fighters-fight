@@ -29,6 +29,9 @@ import {
   FACING_LEFT,
   GROUND_Y_MAX,
   MELEE_Y_FORGIVENESS,
+  BLUE_CASTLE_X,
+  RED_CASTLE_X,
+  CASTLE_WIDTH,
 } from '../../shared/constants.js';
 import { updateEntityMovement } from './physics.js';
 
@@ -412,6 +415,22 @@ function pickFromPool(soldier, pool) {
 export function updateRoyalAI(royal, enemies, friendlies, dt) {
   const dtMs = dt * 1000;
 
+  // Tether logic: Royals defend their castle, they don't conquer the world.
+  const homeX = royal.team === TEAM_BLUE 
+    ? (BLUE_CASTLE_X + CASTLE_WIDTH / 2) 
+    : (RED_CASTLE_X + CASTLE_WIDTH / 2);
+  const tetherDist = 800;
+
+  // Force retreat if too far from home
+  if (Math.abs(royal.x - homeX) > tetherDist) {
+      // Move towards home
+      const dx = homeX - royal.x;
+      // Facing
+      royal.facing = dx > 0 ? FACING_RIGHT : FACING_LEFT;
+      updateEntityMovement(royal, dx > 0 ? 1 : -1, 0, ROYAL_SPEED * royal.speedMultiplier, dt);
+      return { action: null };
+  }
+
   royal.attackCooldownTimer -= dtMs;
   if (royal.attackCooldownTimer < 0) royal.attackCooldownTimer = 0;
 
@@ -420,9 +439,18 @@ export function updateRoyalAI(royal, enemies, friendlies, dt) {
     return { action: null };
   }
 
-  // Find nearest alive enemy
-  const alive = enemies.filter(e => !e.isDead);
-  if (alive.length === 0) return { action: null };
+  // Find nearest alive enemy WITHIN TETHER RANGE
+  const alive = enemies.filter(e => !e.isDead && Math.abs(e.x - homeX) < tetherDist + 200);
+  
+  if (alive.length === 0) {
+      // No enemies nearby? Return to patrol point (homeX)
+      if (Math.abs(royal.x - homeX) > 50) {
+          const dx = homeX - royal.x;
+          royal.facing = dx > 0 ? FACING_RIGHT : FACING_LEFT;
+          updateEntityMovement(royal, dx > 0 ? 1 : -1, 0, ROYAL_SPEED * royal.speedMultiplier * 0.5, dt);
+      }
+      return { action: null };
+  }
 
   let nearest = null;
   let nearestDist = Infinity;
@@ -461,14 +489,13 @@ export function updateRoyalAI(royal, enemies, friendlies, dt) {
   if (friendlies) {
       for (const f of friendlies) {
           if (f.id === royal.id) continue;
-          // Check if it's a Royal (using type string 'king'/'queen' or class check if available, but type is safer here)
           if (f.type !== 'king' && f.type !== 'queen') continue;
           
           const rdx = royal.x - f.x;
           const rdy = royal.y - f.y;
           const rdist = Math.sqrt(rdx*rdx + rdy*rdy);
           if (rdist < 60 && rdist > 0) {
-              const push = (60 - rdist) * 8.0; // Strong repulsion
+              const push = (60 - rdist) * 8.0; 
               tdx += (rdx / rdist) * push;
               tdy += (rdy / rdist) * push;
           }

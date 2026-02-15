@@ -69,6 +69,7 @@ class Player extends Entity {
     this.role = role;
     this.lives = PLAYER_LIVES;
     this.respawnTimer = 0;
+    this.spawnProtectionTimer = 0;
     this.shoutCooldown = 0;
     this.socketId = null;
     this.isOnWall = false; // All roles now on ground for better battle flow
@@ -98,8 +99,14 @@ class Player extends Entity {
     this.input.aimY = msg.ay || 0;
   }
 
+  takeDamage(amount) {
+    if (this.spawnProtectionTimer > 0) return false;
+    return super.takeDamage(amount);
+  }
+
   die() {
     this.lives--;
+    this.spawnProtectionTimer = 0;
     if (this.lives > 0) {
       this.state = STATE_RESPAWNING;
       this.respawnTimer = RESPAWN_DELAY_MS;
@@ -114,6 +121,7 @@ class Player extends Entity {
     this.y = y;
     this.state = STATE_IDLE;
     this.respawnTimer = 0;
+    this.spawnProtectionTimer = 3000;
     this.chargeMs = 0;
     this._prevAtk = false;
   }

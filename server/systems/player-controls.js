@@ -52,6 +52,11 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
   if (player.specialCooldownTimer < 0) player.specialCooldownTimer = 0;
   player.shoutCooldown -= dtMs;
   if (player.shoutCooldown < 0) player.shoutCooldown = 0;
+  
+  if (player.spawnProtectionTimer > 0) {
+    player.spawnProtectionTimer -= dtMs;
+    if (player.spawnProtectionTimer < 0) player.spawnProtectionTimer = 0;
+  }
 
   // Movement
   const { dx, dy, atk, blk, spc, aimX, aimY } = player.input;
