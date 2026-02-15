@@ -1,8 +1,10 @@
 import { PHASE_COUNTDOWN, PHASE_VICTORY, PHASE_ARMY_MARCH, PHASE_OPEN_BATTLE,
-		         PHASE_CASTLE_ASSAULT, PHASE_FINAL_STAND,
-		         STATE_SPECTATING, STATE_DEAD, TEAM_BLUE, TEAM_RED,
-		         TYPE_GUNNER, TYPE_CATAPULT, CATAPULT_CHARGE_MS,
-		         BLUE_CASTLE_X, RED_CASTLE_X, CASTLE_WIDTH, WORLD_WIDTH } from '/shared/constants.js';
+			         PHASE_CASTLE_ASSAULT, PHASE_FINAL_STAND,
+			         STATE_SPECTATING, STATE_DEAD, TEAM_BLUE, TEAM_RED,
+			         TYPE_GUNNER, TYPE_CATAPULT, CATAPULT_CHARGE_MS,
+			         GROUND_Y_MAX,
+			         PROJ_ROCK,
+			         BLUE_CASTLE_X, RED_CASTLE_X, CASTLE_WIDTH, WORLD_WIDTH } from '/shared/constants.js';
 import * as MT from '/shared/message-types.js';
 import { Renderer } from './renderer.js';
 import { Camera } from './camera.js';
@@ -148,12 +150,13 @@ export class Game {
     requestAnimationFrame(this._boundLoop);
   }
 
-  _update(dt, now, freezeFx = false) {
-    // Update mouse world coordinates every frame (for responsive aiming).
-    const worldMouse = this.camera.screenToWorld(this.input.mouseX, this.input.mouseY);
-    this.input.mouseWorldX = worldMouse.x;
-    this.input.mouseWorldY = worldMouse.y;
-    this.hud.setAim(this.input.mouseX, this.input.mouseY, worldMouse.x, worldMouse.y);
+	  _update(dt, now, freezeFx = false) {
+	    // Update mouse world coordinates every frame (for responsive aiming).
+	    const worldMouse = this.camera.screenToWorld(this.input.mouseX, this.input.mouseY);
+	    this.input.mouseWorldX = worldMouse.x;
+	    // Keep aiming on the battlefield band (server clamps too).
+	    this.input.mouseWorldY = Math.max(0, Math.min(GROUND_Y_MAX, worldMouse.y));
+	    this.hud.setAim(this.input.mouseX, this.input.mouseY, worldMouse.x, this.input.mouseWorldY);
 
     // Send input at ~20Hz
     if (now - this.lastInputSend > 50) {
@@ -331,6 +334,17 @@ export class Game {
           if (evt.attackerId != null) {
             this.renderer.addTracer(evt.attackerId, evt.victimId);
           }
+        }
+        break;
+      }
+      case MT.EVT_IMPACT: {
+        const x = evt.x || 0;
+        const y = evt.y || 0;
+        if (evt.type !== PROJ_ROCK) break;
+        if (this.camera.isOnScreen(x)) {
+          this.particles.emit('debris', x, y, 16);
+          this.particles.emit('shockwave', x, y, 1, { size: 90, color: 'rgba(255, 255, 255, 0.28)' });
+          this.camera.shake(6, 180);
         }
         break;
       }

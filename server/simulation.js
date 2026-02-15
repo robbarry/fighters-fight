@@ -68,6 +68,7 @@ import {
   GATE_BULLET_DAMAGE,
   GATE_HIT_DIST,
   SHIELD_BLOCK_REDUCTION,
+  ROCK_AOE_RADIUS,
 } from '../shared/constants.js';
 import {
   EVT_DEATH,
@@ -80,6 +81,7 @@ import {
   EVT_GAMEOVER,
   EVT_GATE_BREAK,
   EVT_ROYAL_SPAWN,
+  EVT_IMPACT,
   CALLOUT_FIRING,
 } from '../shared/message-types.js';
 
@@ -447,9 +449,11 @@ class Simulation {
       // Check if hit either gate
       if (proj.team === TEAM_BLUE && Math.abs(proj.x - RED_GATE_X) < GATE_HIT_DIST) {
         this.castleManager.takeDamage(TEAM_RED, dmg);
+        if (proj.type === PROJ_ROCK) this._detonateRock(proj, proj.x, proj.y);
         proj.alive = false;
       } else if (proj.team === TEAM_RED && Math.abs(proj.x - BLUE_GATE_X) < GATE_HIT_DIST) {
         this.castleManager.takeDamage(TEAM_BLUE, dmg);
+        if (proj.type === PROJ_ROCK) this._detonateRock(proj, proj.x, proj.y);
         proj.alive = false;
       }
     }
@@ -463,6 +467,7 @@ class Simulation {
         continue;
       }
       if (proj.distanceTraveled > proj.maxRange) {
+        if (proj.type === PROJ_ROCK) this._detonateRock(proj, proj.x, proj.y);
         proj.alive = false;
       }
     }
@@ -660,6 +665,55 @@ class Simulation {
 
     // Clean up dead soldiers
     this.armyManager.removeDead();
+  }
+
+  _detonateRock(proj, x, y) {
+    if (!proj) return;
+    const cx = Number.isFinite(x) ? x : (Number.isFinite(proj.x) ? proj.x : 0);
+    const cy = Number.isFinite(y) ? y : (Number.isFinite(proj.y) ? proj.y : 0);
+
+    // Always emit an impact event so a "miss" still has visible feedback.
+    this.events.push({
+      tick: this.tick,
+      e: EVT_IMPACT,
+      type: proj.type,
+      x: Math.round(cx),
+      y: Math.round(cy),
+    });
+
+    const aoeEntities = this.spatialHash.query(cx, cy, ROCK_AOE_RADIUS);
+    for (const ae of aoeEntities) {
+      if (ae.team === proj.team) continue;
+      if (ae.isDead) continue;
+
+      const dx = ae.x - cx;
+      const dy = ae.y - cy;
+      if (Math.sqrt(dx * dx + dy * dy) > ROCK_AOE_RADIUS) continue;
+
+      let aoeDamage = proj.damage;
+      let aoeBlocked = false;
+      if (ae.state === STATE_BLOCK) {
+        aoeDamage *= (1 - SHIELD_BLOCK_REDUCTION);
+        aoeBlocked = true;
+      }
+      aoeDamage = Math.max(1, aoeDamage);
+      ae.takeDamage(aoeDamage);
+
+      this.events.push({
+        tick: this.tick,
+        e: EVT_HIT,
+        attackerId: proj.ownerId,
+        victimId: ae.id,
+        dmg: Math.round(aoeDamage),
+        blocked: !!aoeBlocked,
+        x: Math.round(ae.x),
+        y: Math.round(ae.y),
+      });
+
+      if (ae.isDead) {
+        this._handleEntityDeath(ae);
+      }
+    }
   }
 
   _handleEntityDeath(entity) {
