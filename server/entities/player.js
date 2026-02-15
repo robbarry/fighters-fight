@@ -75,9 +75,10 @@ class Player extends Entity {
     this.isHuman = true;
     this.controlsRoyalId = null; // when set, player input drives that royal (FINAL_STAND)
 
-    this.input = { dx: 0, dy: 0, atk: false, blk: false, aimX: 0, aimY: 0 };
+    this.input = { dx: 0, dy: 0, atk: false, blk: false, spc: false, aimX: 0, aimY: 0 };
 
     this.attackCooldownTimer = 0;
+    this.specialCooldownTimer = 0;
     this.attackCooldownBase = cooldownForRole(role);
     this.damage = damageForRole(role);
     this.attackRange = rangeForRole(role);
@@ -92,6 +93,7 @@ class Player extends Entity {
     this.input.dy = msg.dy || 0;
     this.input.atk = !!msg.atk;
     this.input.blk = !!msg.blk;
+    this.input.spc = !!msg.spc;
     this.input.aimX = msg.ax || 0;
     this.input.aimY = msg.ay || 0;
   }

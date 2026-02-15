@@ -58,6 +58,11 @@ import {
   GROUND_Y_MAX,
   SHOUT_COOLDOWN_MS,
   ROYAL_SPEED,
+  ABILITY_COOLDOWN_SWORD,
+  ABILITY_COOLDOWN_SPEAR,
+  ABILITY_COOLDOWN_ARCHER,
+  ABILITY_COOLDOWN_GUNNER,
+  ABILITY_COOLDOWN_CATAPULT,
 } from '../shared/constants.js';
 import {
   EVT_DEATH,
@@ -385,11 +390,13 @@ class Simulation {
       const dtMs = dt * 1000;
       player.attackCooldownTimer -= dtMs;
       if (player.attackCooldownTimer < 0) player.attackCooldownTimer = 0;
+      player.specialCooldownTimer -= dtMs;
+      if (player.specialCooldownTimer < 0) player.specialCooldownTimer = 0;
       player.shoutCooldown -= dtMs;
       if (player.shoutCooldown < 0) player.shoutCooldown = 0;
 
       // Movement
-      const { dx, dy, atk, blk, aimX, aimY } = player.input;
+      const { dx, dy, atk, blk, spc, aimX, aimY } = player.input;
       if (player.isOnWall) {
         // Keep wall roles pinned to the battlements lane.
         player.y = 30;
@@ -413,6 +420,81 @@ class Simulation {
         player.state = STATE_BLOCK;
       } else if (player.state === STATE_BLOCK) {
         player.state = STATE_IDLE;
+      }
+
+      // Special Ability
+      if (spc && player.specialCooldownTimer <= 0) {
+        const enemies = player.team === TEAM_BLUE ? redEntities : blueEntities;
+        
+        switch (player.role) {
+          case TYPE_SWORD:
+            // Whirlwind: AOE attack
+            player.specialCooldownTimer = ABILITY_COOLDOWN_SWORD;
+            const nearby = this.spatialHash.query(player.x, player.y, 80);
+            for (const e of nearby) {
+               if (e.team !== player.team && !e.isDead) {
+                  // Check distance
+                  const dist = Math.abs(e.x - player.x);
+                  if (dist < 60) {
+                      const res = processMeleeAttack(player, e, 20); // Bonus damage
+                      this.events.push({ tick: this.tick, e: EVT_HIT, attackerId: player.id, victimId: e.id, dmg: Math.round(res.damage), x: Math.round(e.x), y: Math.round(e.y) });
+                      if (e.isDead) this._handleEntityDeath(e);
+                  }
+               }
+            }
+            this.events.push({ tick: this.tick, e: EVT_SHOUT, id: player.id, msg: 4 }); // Use "Throwing spears" slot as placeholder for now, or just generic shout
+            break;
+            
+          case TYPE_SPEAR:
+            // Dash
+            player.specialCooldownTimer = ABILITY_COOLDOWN_SPEAR;
+            const dir = player.facing === 0 ? 1 : -1;
+            player.x += dir * 250; // Teleport/Dash
+            // Clamp world bounds
+            if (player.x < 0) player.x = 0;
+            if (player.x > 6000) player.x = 6000;
+            break;
+            
+          case TYPE_ARCHER:
+             // Volley
+             player.specialCooldownTimer = ABILITY_COOLDOWN_ARCHER;
+             const baseAngle = Math.atan2(aimY - player.y, aimX - player.x);
+             const spread = 0.2; // radians
+             for(let i=-1; i<=1; i++) {
+                 const angle = baseAngle + i * spread;
+                 const vx = Math.cos(angle) * ARROW_SPEED;
+                 const vy = Math.sin(angle) * ARROW_SPEED;
+                 const proj = new Projectile(this.genId(), PROJ_ARROW, player.team, player.x, player.y, vx, vy, player.id);
+                 proj.damage = player.damage;
+                 this.projectiles.push(proj);
+             }
+             this.events.push({ tick: this.tick, e: EVT_FIRE, id: player.id, type: PROJ_ARROW, x: Math.round(player.x), y: Math.round(player.y) });
+             break;
+             
+          case TYPE_GUNNER:
+             // Shotgun blast
+             player.specialCooldownTimer = ABILITY_COOLDOWN_GUNNER;
+             const gAngle = Math.atan2(aimY - player.y, aimX - player.x);
+             const gSpread = 0.15;
+             for(let i=-1; i<=1; i++) {
+                 const angle = gAngle + i * gSpread;
+                 const vx = Math.cos(angle) * BULLET_SPEED;
+                 const vy = Math.sin(angle) * BULLET_SPEED;
+                 const proj = new Projectile(this.genId(), PROJ_BULLET, player.team, player.x, player.y, vx, vy, player.id);
+                 proj.damage = player.damage;
+                 proj.maxRange = 600; // Shorter range
+                 this.projectiles.push(proj);
+             }
+             this.events.push({ tick: this.tick, e: EVT_FIRE, id: player.id, type: PROJ_BULLET, x: Math.round(player.x), y: Math.round(player.y) });
+             break;
+             
+          case TYPE_CATAPULT:
+             // Rapid Fire
+             player.specialCooldownTimer = ABILITY_COOLDOWN_CATAPULT;
+             player.attackCooldownTimer = 0;
+             this.events.push({ tick: this.tick, e: EVT_SHOUT, id: player.id, msg: 3 }); // "FIRING!"
+             break;
+        }
       }
 
       // Attack

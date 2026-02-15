@@ -40,15 +40,34 @@ export class Input {
       this.keys.delete(e.code);
     });
 
+    this.mouseDown = false;
+    this.rightMouseDown = false;
+
     canvas.addEventListener('mousemove', (e) => {
       const rect = canvas.getBoundingClientRect();
       this.mouseX = e.clientX - rect.left;
       this.mouseY = e.clientY - rect.top;
     });
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (this._uiBlocked()) return;
+      if (e.button === 0) this.mouseDown = true;
+      if (e.button === 2) this.rightMouseDown = true;
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+      if (e.button === 0) this.mouseDown = false;
+      if (e.button === 2) this.rightMouseDown = false;
+    });
+
+    // Prevent context menu on right click
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
   }
 
   clearKeys() {
     this.keys.clear();
+    this.mouseDown = false;
+    this.rightMouseDown = false;
     this.tabPressed = false;
     this.overviewPressed = false;
     this.pendingShout = null;
@@ -59,6 +78,7 @@ export class Input {
   }
 
   _hasAny(codes) {
+    if (!codes) return false;
     for (const code of codes) {
       if (this.keys.has(code)) return true;
     }
@@ -77,12 +97,17 @@ export class Input {
 
   isAttacking() {
     if (this._uiBlocked()) return false;
-    return this._hasAny(KEYBINDS.attack);
+    return this.mouseDown || this._hasAny(KEYBINDS.attack);
   }
 
   isBlocking() {
     if (this._uiBlocked()) return false;
-    return this._hasAny(KEYBINDS.block);
+    return this.rightMouseDown || this._hasAny(KEYBINDS.block);
+  }
+
+  isSpecial() {
+    if (this._uiBlocked()) return false;
+    return this._hasAny(KEYBINDS.special);
   }
 
   consumeShout() {
@@ -110,6 +135,7 @@ export class Input {
       dx, dy,
       atk: this.isAttacking() ? 1 : 0,
       blk: this.isBlocking() ? 1 : 0,
+      spc: this.isSpecial() ? 1 : 0,
       ax: Math.round(this.mouseWorldX),
       ay: Math.round(this.mouseWorldY)
     };

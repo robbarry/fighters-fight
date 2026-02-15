@@ -44,12 +44,20 @@ export const PHASE_FINAL_STAND = 5;
 export const PHASE_VICTORY = 6;
 
 // ─── Timing ──────────────────────────────────────────────
-export const TICK_RATE = 20;
+export const TICK_RATE = 30;
 export const TICK_MS = 1000 / TICK_RATE;
 export const COUNTDOWN_SECONDS = 3;
 export const DEATH_ANIM_MS = 2000;
 export const RESPAWN_DELAY_MS = 3000;
 export const SHOUT_COOLDOWN_MS = 2000;
+
+// ─── Special Abilities ───────────────────────────────────
+export const ABILITY_COOLDOWN_SWORD = 5000; // Whirlwind
+export const ABILITY_COOLDOWN_SPEAR = 4000; // Dash
+export const ABILITY_COOLDOWN_ARCHER = 6000; // Volley
+export const ABILITY_COOLDOWN_GUNNER = 8000; // Grenade/Blast
+export const ABILITY_COOLDOWN_CATAPULT = 10000; // Rapid fire mode?
+
 
 // ─── Castle ──────────────────────────────────────────────
 export const CASTLE_WIDTH = 300;
@@ -100,22 +108,22 @@ export const SPEAR_COOLDOWN = 900;
 
 // ─── Combat: Archer ──────────────────────────────────────
 export const ARROW_DAMAGE = 6;
-export const ARROW_RANGE = 800;
+export const ARROW_RANGE = 950;
 export const ARROW_SPEED = 400;
 export const ARROW_COOLDOWN = 1200;
 
 // ─── Combat: Gunner ──────────────────────────────────────
 export const BULLET_DAMAGE = 8;
-export const BULLET_RANGE = 6000;
+export const BULLET_RANGE = 1400;
 export const BULLET_SPEED = 850;
 export const BULLET_COOLDOWN = 1500;
 
 // ─── Combat: Catapult ────────────────────────────────────
 export const ROCK_DAMAGE = 15;
-export const ROCK_RANGE = 1200;
-export const ROCK_SPEED = 250;
+export const ROCK_RANGE = 1600;
+export const ROCK_SPEED = 300;
 export const ROCK_COOLDOWN = 3000;
-export const ROCK_AOE_RADIUS = 60;
+export const ROCK_AOE_RADIUS = 90;
 export const CATAPULT_CHARGE_MS = 1000;
 export const CATAPULT_CHARGE_SPEED_MAX_MULT = 1.7;
 export const CATAPULT_CHARGE_DAMAGE_MAX_MULT = 1.35;

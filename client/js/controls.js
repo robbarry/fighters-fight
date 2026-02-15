@@ -10,7 +10,8 @@ export const KEYBINDS = {
   moveUp: ['KeyW', 'ArrowUp'],
   moveDown: ['KeyS', 'ArrowDown'],
 
-  attack: ['Space'],
+  attack: ['KeyE'], // Primary is Mouse Click
+  special: ['Space'],
   block: ['KeyQ'],
 
   spectateNext: ['Tab'],
@@ -60,11 +61,15 @@ export const HELP_SECTIONS = [
     title: 'Combat',
     rows: [
       {
-        combos: [KEYBINDS.attack],
-        text: 'Attack / fire. Hold Space to keep attacking. Catapult: hold to charge, release to fire.',
+        keysText: 'Left Click or E',
+        text: 'Attack / fire. Catapult: hold to charge, release to fire.',
       },
       {
-        combos: [KEYBINDS.block],
+        keysText: 'Space',
+        text: 'Special Ability (Dash, Whirlwind, Volley, etc.)',
+      },
+      {
+        keysText: 'Right Click or Q',
         text: 'Block (Sword/Spear only).',
       },
       {

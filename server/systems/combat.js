@@ -14,7 +14,7 @@ function projectileHitRadius(type) {
   switch (type) {
     case PROJ_BULLET: return 9;
     case PROJ_ARROW: return 12;
-    case PROJ_ROCK: return 18;
+    case PROJ_ROCK: return 40;
     default: return 15;
   }
 }

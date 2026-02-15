@@ -4,12 +4,12 @@ import { PHASE_COUNTDOWN, PHASE_VICTORY, PHASE_ARMY_MARCH, PHASE_OPEN_BATTLE,
 		         TYPE_GUNNER, TYPE_CATAPULT, CATAPULT_CHARGE_MS,
 		         BLUE_CASTLE_X, RED_CASTLE_X, CASTLE_WIDTH } from '/shared/constants.js';
 import * as MT from '/shared/message-types.js';
-import { Renderer } from './renderer.js';
+import { Renderer } from './renderer-new.js';
 import { Camera } from './camera.js';
 import { Input } from './input.js';
 import { Interpolation } from './interpolation.js';
 import { HUD } from './hud.js';
-import { ParticleSystem } from './particles.js';
+import { ParticleSystem } from './particles-new.js';
 import { roleName } from './roles.js';
 
 const SHOUT_TEXTS = ['I need help!', "Let's go!", 'Hi!', 'FIRING!', 'Throwing spears!'];
@@ -233,7 +233,8 @@ export class Game {
       }
     }
 
-    this.camera.follow(followX);
+    const mouseRatio = Math.max(0, Math.min(1, this.input.mouseX / this.canvas.width));
+    this.camera.follow(followX, mouseRatio);
   }
 
   _render(snap, localPlayer) {
@@ -284,7 +285,8 @@ export class Game {
           this.particles.emit('hit_spark', x, y, isCatapultImpact ? 10 : 6, { isOnWall });
           this.particles.emit('blood', x, y, isCatapultImpact ? 10 : 7, { isOnWall });
           if (isCatapultImpact) {
-            this.particles.emit('debris', x, y, 10, { isOnWall });
+            this.particles.emit('debris', x, y, 16, { isOnWall });
+            this.particles.emit('shockwave', x, y, 1, { isOnWall, size: 100, color: 'rgba(255, 255, 255, 0.4)' });
           }
           this.hud.addDamageNumber(dmg, x, y, isOnWall, critical);
         }

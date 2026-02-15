@@ -9,6 +9,7 @@ export class Camera {
     this._overview = false;
     this.x = 0;
     this.targetX = 0;
+    this.lookOffset = 0; // Dynamic offset based on mouse
     this.scale = canvasWidth / this.worldViewWidth;
 
     this.groundScreenY = canvasHeight * 0.65;
@@ -32,64 +33,34 @@ export class Camera {
     if (this._overview) {
       this.x = 0;
       this.targetX = 0;
+      this.lookOffset = 0;
     }
     this.clamp();
   }
+  
+  // ... (keep existing methods)
 
-  isOverview() {
-    return this._overview;
-  }
-
-  resize(canvasWidth, canvasHeight) {
-    this.canvasWidth = canvasWidth;
-    this.canvasHeight = canvasHeight;
-    this.scale = canvasWidth / this.worldViewWidth;
-    this.groundScreenY = canvasHeight * 0.65;
-    this.groundBandHeight = canvasHeight * 0.15;
-    this.wallScreenY = canvasHeight * 0.35;
-    this.skyHeight = this.groundScreenY;
-  }
-
-  update(dtMs) {
-    if (this._shakeMs > 0) {
-      this._shakeMs -= dtMs;
-      if (this._shakeMs < 0) this._shakeMs = 0;
-
-      const denom = this._shakeTotalMs > 0 ? this._shakeTotalMs : 1;
-      const k = this._shakeMs / denom;
-      const intensity = this._shakeIntensity * k;
-
-      // Fresh random each frame keeps it punchy.
-      this.shakeX = (Math.random() * 2 - 1) * intensity;
-      this.shakeY = (Math.random() * 2 - 1) * intensity * 0.65;
-
-      if (this._shakeMs === 0) {
-        this.shakeX = 0;
-        this.shakeY = 0;
-        this._shakeTotalMs = 0;
-        this._shakeIntensity = 0;
-      }
-    }
-  }
-
-  shake(intensityPx, durationMs) {
-    if (!Number.isFinite(intensityPx) || !Number.isFinite(durationMs)) return;
-    if (intensityPx <= 0 || durationMs <= 0) return;
-
-    // If multiple shakes happen close together, keep the stronger/longer one.
-    this._shakeIntensity = Math.max(this._shakeIntensity, intensityPx);
-    this._shakeMs = Math.max(this._shakeMs, durationMs);
-    this._shakeTotalMs = Math.max(this._shakeTotalMs, durationMs);
-  }
-
-  follow(worldX) {
-    this.targetX = worldX - this.worldViewWidth / 2;
+  follow(worldX, mouseXRatio = 0.5) {
+    // worldX is the player's center.
+    // mouseXRatio is 0..1 (0=left edge, 1=right edge).
+    
+    // Shift camera target based on mouse position (Look Ahead)
+    // Max shift is 40% of view width in either direction.
+    const shift = (mouseXRatio - 0.5) * this.worldViewWidth * 0.8;
+    this.lookOffset += (shift - this.lookOffset) * 0.1; // Smooth it out
+    
+    this.targetX = worldX - this.worldViewWidth / 2 + this.lookOffset;
+    
+    // Soft follow
     this.x += (this.targetX - this.x) * 0.1;
     this.clamp();
   }
 
   clamp() {
-    this.x = Math.max(0, Math.min(this.x, WORLD_WIDTH - this.worldViewWidth));
+    // Ensure we don't show "void" outside world bounds
+    const minX = -100; 
+    const maxX = WORLD_WIDTH - this.worldViewWidth + 100;
+    this.x = Math.max(minX, Math.min(this.x, maxX));
   }
 
   worldToScreen(wx, wy, isOnWall = false) {
