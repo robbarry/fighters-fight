@@ -1,0 +1,11 @@
+{
+  "source": {
+    "include": ["server", "shared"],
+    "includePattern": ".js$",
+    "excludePattern": "(node_modules/|docs)"
+  },
+  "opts": {
+    "destination": "./docs/api",
+    "recurse": true
+  }
+}

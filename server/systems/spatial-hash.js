@@ -3,6 +3,8 @@ import { SPATIAL_CELL_SIZE } from '../../shared/constants.js';
 class SpatialHash {
   constructor(cellSize = SPATIAL_CELL_SIZE) {
     this.cellSize = cellSize;
+    // Since world Y is small (0-60) and cell size is 100, we effectively only have horizontal cells.
+    // We use a Map<number, Entity[]> where the key is the cell X index.
     this.cells = new Map();
   }
 
@@ -10,41 +12,33 @@ class SpatialHash {
     this.cells.clear();
   }
 
-  _getCellCoords(x, y) {
-    return [Math.floor(x / this.cellSize), Math.floor(y / this.cellSize)];
-  }
-
-  _getCellKey(cx, cy) {
-    return `${cx},${cy}`;
+  _getCellIndex(x) {
+    return Math.floor(x / this.cellSize);
   }
 
   insert(entity) {
-    const [cx, cy] = this._getCellCoords(entity.x, entity.y);
-    const key = this._getCellKey(cx, cy);
-    if (!this.cells.has(key)) {
-      this.cells.set(key, []);
+    const cx = this._getCellIndex(entity.x);
+    let cell = this.cells.get(cx);
+    if (!cell) {
+      cell = [];
+      this.cells.set(cx, cell);
     }
-    this.cells.get(key).push(entity);
+    cell.push(entity);
   }
 
   query(x, y, radius) {
     const results = [];
-    const seen = new Set();
+    // We don't need a Set for 'seen' because an entity exists in exactly one cell in this implementation
+    // (point insertion). Query iterates unique cells.
 
     const minCx = Math.floor((x - radius) / this.cellSize);
     const maxCx = Math.floor((x + radius) / this.cellSize);
-    const minCy = Math.floor((y - radius) / this.cellSize);
-    const maxCy = Math.floor((y + radius) / this.cellSize);
 
     for (let cx = minCx; cx <= maxCx; cx++) {
-      for (let cy = minCy; cy <= maxCy; cy++) {
-        const key = this._getCellKey(cx, cy);
-        const cell = this.cells.get(key);
-        if (!cell) continue;
-        for (const entity of cell) {
-          if (seen.has(entity.id)) continue;
-          seen.add(entity.id);
-          results.push(entity);
+      const cell = this.cells.get(cx);
+      if (cell) {
+        for (let i = 0; i < cell.length; i++) {
+          results.push(cell[i]);
         }
       }
     }
