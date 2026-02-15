@@ -2,7 +2,7 @@ import { PHASE_COUNTDOWN, PHASE_VICTORY, PHASE_ARMY_MARCH, PHASE_OPEN_BATTLE,
 		         PHASE_CASTLE_ASSAULT, PHASE_FINAL_STAND,
 		         STATE_SPECTATING, STATE_DEAD, TEAM_BLUE, TEAM_RED,
 		         TYPE_GUNNER, TYPE_CATAPULT, CATAPULT_CHARGE_MS,
-		         BLUE_CASTLE_X, RED_CASTLE_X, CASTLE_WIDTH } from '/shared/constants.js';
+		         BLUE_CASTLE_X, RED_CASTLE_X, CASTLE_WIDTH, WORLD_WIDTH } from '/shared/constants.js';
 import * as MT from '/shared/message-types.js';
 import { Renderer } from './renderer.js';
 import { Camera } from './camera.js';
@@ -227,6 +227,9 @@ export class Game {
         if (allies.length > 0) {
           const idx = this.spectateIndex % allies.length;
           followX = allies[idx][3];
+        } else {
+          // No allies left? Free look across the whole map
+          followX = (this.input.mouseX / this.canvas.width) * WORLD_WIDTH;
         }
       } else {
         followX = localPlayer[3];

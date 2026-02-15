@@ -518,13 +518,12 @@ class Simulation {
         const king = new Royal(this.genId(), true, losingTeam, castleCenter - 30, 30);
         const queen = new Royal(this.genId(), false, losingTeam, castleCenter + 30, 30);
 
-        // Assign human players to royals
-        const losingPlayers = this.players.filter(
-          p => p.team === losingTeam && p.state !== STATE_SPECTATING
-        );
-
-	        if (losingPlayers.length >= 2) {
-	          // Co-op defending: P1=King, P2=Queen
+                // Assign human players to royals
+                const losingPlayers = this.players.filter(
+                  p => p.team === losingTeam
+                );
+        
+                if (losingPlayers.length >= 2) {	          // Co-op defending: P1=King, P2=Queen
 	          king.isHumanControlled = true;
 	          king.controllingPlayerId = losingPlayers[0].id;
 	          queen.isHumanControlled = true;
