@@ -45,7 +45,7 @@ npm start
 
 All enums are small ints. Entity arrays are compact:
 - soldiers: `[id, type, team, x, y, hp, state, facing, isOnWall]`
-- players: `[id, role, team, x, y, hp, state, facing, lives, isOnWall]`
+- players: `[id, role, team, x, y, hp, state, facing, lives, isOnWall, controlsRoyalId]`
 - royals: `[id, isKing, team, x, y, hp, state, facing]`
 - projectiles: `[id, type, team, x, y, ownerId, dist]`
 

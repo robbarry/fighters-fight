@@ -67,6 +67,7 @@ import {
   GATE_ARROW_DAMAGE,
   GATE_BULLET_DAMAGE,
   GATE_HIT_DIST,
+  SHIELD_BLOCK_REDUCTION,
 } from '../shared/constants.js';
 import {
   EVT_DEATH,
@@ -297,11 +298,10 @@ class Simulation {
           y: Math.round(soldier.y),
         });
       } else if (result.action === 'hitscan' && result.target) {
-        const enemies2 = soldier.team === TEAM_BLUE ? redEntities : blueEntities;
         const hit = processHitscan(
           soldier.x, soldier.y,
           result.target.x, result.target.y,
-          soldier.team, enemies2, soldier.attackRange,
+          soldier.team, enemies, soldier.attackRange,
           {
             yForgiveness: soldier.type === TYPE_GUNNER ? 10 : undefined,
             minRange: (soldier.type === TYPE_GUNNER && soldier.isOnWall) ? 140 : 0,
@@ -312,7 +312,7 @@ class Simulation {
           let dmg = soldier.damage;
           let blocked = false;
           if (target.state === STATE_BLOCK) {
-             dmg *= (1 - 0.95); 
+             dmg *= (1 - SHIELD_BLOCK_REDUCTION);
              blocked = true;
           }
           target.takeDamage(dmg);
@@ -572,8 +572,7 @@ class Simulation {
         const losingTeamRoyals = this.royals.filter(r => !r.isDead);
         if (losingTeamRoyals.length === 0) {
           this.phase = PHASE_VICTORY;
-          // Winner is the team that is NOT the losing team
-          const losingTeam = this.royals[0].team;
+          const losingTeam = this._getLosingTeam();
           this.winner = losingTeam === TEAM_BLUE ? TEAM_RED : TEAM_BLUE;
           this.events.push({
             tick: this.tick,

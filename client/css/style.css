@@ -205,6 +205,9 @@ kbd {
 .ready-btn:disabled { background: #555; cursor: not-allowed; transform: none; }
 .ready-btn.is-ready { background: #888; }
 
+.solo-btn { background: #8844ff; }
+.solo-btn:hover { background: #9955ff; }
+
 .status-text { font-size: 1em; color: #aaa; margin-top: 10px; }
 
 .other-player-info {

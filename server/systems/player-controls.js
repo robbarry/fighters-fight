@@ -32,6 +32,8 @@ import {
   BLUE_CASTLE_X,
   RED_CASTLE_X,
   CASTLE_WIDTH,
+  WORLD_WIDTH,
+  MELEE_Y_FORGIVENESS,
 } from '../../shared/constants.js';
 import {
   EVT_HIT,
@@ -97,9 +99,9 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
         const nearby = simulation.spatialHash.query(player.x, player.y, 80);
         for (const e of nearby) {
            if (e.team !== player.team && !e.isDead) {
-              // Check distance
               const dist = Math.abs(e.x - player.x);
-              if (dist < 60) {
+              const edy = Math.abs(e.y - player.y);
+              if (dist < 60 && edy <= MELEE_Y_FORGIVENESS) {
                   const res = processMeleeAttack(player, e, 20); // Bonus damage
                   simulation.events.push({ tick: simulation.tick, e: EVT_HIT, attackerId: player.id, victimId: e.id, dmg: Math.round(res.damage), blocked: !!res.blocked, x: Math.round(e.x), y: Math.round(e.y) });
                   if (e.isDead) simulation._handleEntityDeath(e);
@@ -116,7 +118,7 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
         player.x += dir * 250; // Teleport/Dash
         // Clamp world bounds
         if (player.x < 0) player.x = 0;
-        if (player.x > 6000) player.x = 6000;
+        if (player.x > WORLD_WIDTH) player.x = WORLD_WIDTH;
         break;
         
       case TYPE_ARCHER:
