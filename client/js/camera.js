@@ -37,8 +37,52 @@ export class Camera {
     }
     this.clamp();
   }
-  
-  // ... (keep existing methods)
+
+  isOverview() {
+    return this._overview;
+  }
+
+  resize(canvasWidth, canvasHeight) {
+    this.canvasWidth = canvasWidth;
+    this.canvasHeight = canvasHeight;
+    this.scale = canvasWidth / this.worldViewWidth;
+    this.groundScreenY = canvasHeight * 0.65;
+    this.groundBandHeight = canvasHeight * 0.15;
+    this.wallScreenY = canvasHeight * 0.35;
+    this.skyHeight = this.groundScreenY;
+  }
+
+  update(dtMs) {
+    if (this._shakeMs > 0) {
+      this._shakeMs -= dtMs;
+      if (this._shakeMs < 0) this._shakeMs = 0;
+
+      const denom = this._shakeTotalMs > 0 ? this._shakeTotalMs : 1;
+      const k = this._shakeMs / denom;
+      const intensity = this._shakeIntensity * k;
+
+      // Fresh random each frame keeps it punchy.
+      this.shakeX = (Math.random() * 2 - 1) * intensity;
+      this.shakeY = (Math.random() * 2 - 1) * intensity * 0.65;
+
+      if (this._shakeMs === 0) {
+        this.shakeX = 0;
+        this.shakeY = 0;
+        this._shakeTotalMs = 0;
+        this._shakeIntensity = 0;
+      }
+    }
+  }
+
+  shake(intensityPx, durationMs) {
+    if (!Number.isFinite(intensityPx) || !Number.isFinite(durationMs)) return;
+    if (intensityPx <= 0 || durationMs <= 0) return;
+
+    // If multiple shakes happen close together, keep the stronger/longer one.
+    this._shakeIntensity = Math.max(this._shakeIntensity, intensityPx);
+    this._shakeMs = Math.max(this._shakeMs, durationMs);
+    this._shakeTotalMs = Math.max(this._shakeTotalMs, durationMs);
+  }
 
   follow(worldX, mouseXRatio = 0.5) {
     // worldX is the player's center.
