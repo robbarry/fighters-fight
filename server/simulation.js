@@ -519,6 +519,13 @@ class Simulation {
         const king = new Royal(this.genId(), true, losingTeam, castleCenter - 30, 30);
         const queen = new Royal(this.genId(), false, losingTeam, castleCenter + 30, 30);
 
+        if (this.isSolo) {
+          king.hp = 750;
+          king.maxHp = 750;
+          queen.hp = 750;
+          queen.maxHp = 750;
+        }
+
                 // Assign human players to royals
                 const losingPlayers = this.players.filter(
                   p => p.team === losingTeam
@@ -692,6 +699,7 @@ class Simulation {
 
   startGame() {
     this.nextId = 1;
+    this.isSolo = this.players.length === 1;
     // Re-assign player IDs
     for (const p of this.players) {
       p.id = this.genId();
