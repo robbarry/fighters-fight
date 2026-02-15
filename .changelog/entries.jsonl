@@ -1,0 +1,28 @@
+{"date":"2026-02-14","category":"Added","description":"Initial game: two-player castle siege with 140 AI soldiers, 5 roles (sword, spear, archer, gunner, catapult), 7 game phases, WebSocket networking at 20Hz, and 60fps canvas rendering","commits":["f63c6c7"],"verified":true}
+{"date":"2026-02-14","category":"Fixed","description":"Wall roles (archer, gunner) now spawn on battlements and stay clamped to their team's wall segment instead of spawning on the ground","commits":["fec4913"],"verified":true}
+{"date":"2026-02-14","category":"Added","description":"Hit feedback particle effects (sparks, blood) on combat impacts","commits":["fec4913"],"verified":true}
+{"date":"2026-02-14","category":"Added","description":"Help overlay with controls reference and touch-screen mobile control panel","commits":["104584f"],"verified":true}
+{"date":"2026-02-14","category":"Changed","description":"Renderer overhaul: atmospheric sky gradients, parallax clouds, detailed castle artwork, improved ground and battlefield visuals","commits":["2455acf"],"verified":true}
+{"date":"2026-02-14","category":"Changed","description":"Camera system refactored with smooth follow and zoom; tick rate bumped from 20Hz to 30Hz","commits":["084b0a6"],"verified":true}
+{"date":"2026-02-14","category":"Changed","description":"Weapon balance: archer range 800->950, gunner range 6000->1400, catapult range 1200->1600, rock speed 250->300, rock AoE 60->90","commits":["084b0a6"],"verified":true}
+{"date":"2026-02-14","category":"Added","description":"Special ability cooldown constants for all five roles (whirlwind, dash, volley, grenade, rapid fire)","commits":["084b0a6"],"verified":true}
+{"date":"2026-02-14","category":"Fixed","description":"Shield blocking now gives proper visual and gameplay feedback; sky aiming corrected for ranged roles","commits":["dea0ed3"],"verified":true}
+{"date":"2026-02-14","category":"Fixed","description":"Disconnection handling: players now see a 'Disconnected' message with refresh prompt instead of a frozen screen","commits":["26f106f"],"verified":true}
+{"date":"2026-02-14","category":"Changed","description":"Player controls extracted into dedicated server/systems/player-controls.js module; spatial hash optimized","commits":["336e650","836d276"],"verified":true}
+{"date":"2026-02-14","category":"Added","description":"Unit tests for spatial hash grid and player controls","commits":["336e650"],"verified":true}
+{"date":"2026-02-14","category":"Added","description":"API documentation in docs/API.md","commits":["336e650"],"verified":true}
+{"date":"2026-02-14","category":"Changed","description":"Particle system rewritten with object pooling, gravity, bounce, and multiple effect types (sparks, blood, dust, shield)","commits":["792e210"],"verified":true}
+{"date":"2026-02-14","category":"Changed","description":"Cleanup: removed backup renderer and particle files, consolidated into final versions","commits":["b958739"],"verified":true}
+{"date":"2026-02-14","category":"Changed","description":"Royal stats buffed significantly: HP 1000->8000, king damage 25->40, queen damage 22->35","commits":["0ec1289"],"verified":true}
+{"date":"2026-02-14","category":"Fixed","description":"Gate damage now works for all projectile types (arrows, bullets, rocks) instead of only rocks; added GATE_ARROW_DAMAGE, GATE_BULLET_DAMAGE, GATE_HIT_DIST constants","commits":["e4fc4bd"],"verified":true}
+{"date":"2026-02-14","category":"Fixed","description":"Spectator camera now moves freely instead of being locked to a single position","commits":["59526a4"],"verified":true}
+{"date":"2026-02-14","category":"Fixed","description":"Royal AI: king and queen no longer stack on top of each other thanks to repulsion force; royals pass friendly list for separation behavior","commits":["b29bbce"],"verified":true}
+{"date":"2026-02-14","category":"Changed","description":"Royal HP reduced from 8000 to 3000 after initial overbuff","commits":["b29bbce"],"verified":true}
+{"date":"2026-02-14","category":"Added","description":"Spawn protection: players are invulnerable for 3 seconds after respawning","commits":["af7a901"],"verified":true}
+{"date":"2026-02-14","category":"Added","description":"Royal tether system: royals stay within 800 units of their home castle and retreat if they wander too far","commits":["af7a901"],"verified":true}
+{"date":"2026-02-14","category":"Fixed","description":"Defender victory condition: defenders now win if all attacking players are eliminated (out of lives) during FINAL_STAND, not just when royals die","commits":["af7a901"],"verified":true}
+{"date":"2026-02-14","category":"Added","description":"Single player (solo) mode: PLAY SOLO button in lobby starts the game with one player, no need to wait for an opponent","commits":["faeb234"],"verified":true}
+{"date":"2026-02-14","category":"Fixed","description":"Solo mode balance: royal HP reduced to 750 (from 8000) in solo games so a single player can actually win","commits":["351601c","6185c18"],"verified":true}
+{"date":"2026-02-14","category":"Fixed","description":"Solo button styling: purple background color applied correctly","commits":["a7f2a19"],"verified":true}
+{"date":"2026-02-14","category":"Added","description":"Parabolic projectile trajectories: arrows and rocks now arc through the air with height proportional to shot distance, rendered client-side via sin(progress) curve","commits":["a38bc0f"],"verified":true}
+{"date":"2026-02-14","category":"Fixed","description":"Projectile aiming: physics aimY re-clamped to ground plane to prevent shots flying into space, while visual aim remains free for trajectory display","commits":["3ec16e7","efc230f","3572b3a"],"verified":true}

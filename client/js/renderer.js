@@ -561,8 +561,8 @@ export class Renderer {
     let arc = 0;
     if (type === PROJ_ROCK || type === PROJ_ARROW) {
         const progress = Math.max(0, Math.min(1, dist / targetDist));
-        // Dynamic height based on shot distance
-        const maxHeight = targetDist * 0.3; 
+        const baseHeight = type === PROJ_ROCK ? 0.08 : 0.05;
+        const maxHeight = Math.min(targetDist * baseHeight, type === PROJ_ROCK ? 140 : 70);
         arc = Math.sin(progress * Math.PI) * maxHeight * cam.scale;
     }
 
