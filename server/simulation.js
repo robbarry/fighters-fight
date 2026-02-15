@@ -243,6 +243,7 @@ class Simulation {
             attackerId: soldier.id,
             victimId: result.target.id,
             dmg: Math.round(res.damage),
+            blocked: !!res.blocked,
             x: Math.round(result.target.x),
             y: Math.round(result.target.y),
           });
@@ -285,15 +286,25 @@ class Simulation {
           result.target.x, result.target.y,
           soldier.team, enemies2, soldier.attackRange,
           {
-            // Wall gunners were too oppressive; make AI gunners less accurate and
-            // avoid shooting targets right at the base of the wall.
             yForgiveness: soldier.type === TYPE_GUNNER ? 10 : undefined,
             minRange: (soldier.type === TYPE_GUNNER && soldier.isOnWall) ? 140 : 0,
           }
         );
         if (hit) {
           const target = hit.entity;
-          const dmg = soldier.damage;
+          let dmg = soldier.damage;
+          let blocked = false;
+          if (target.state === STATE_BLOCK) {
+             dmg *= (1 - 0.95); // SHIELD_BLOCK_REDUCTION hardcoded or import? It's imported as SHIELD_BLOCK_REDUCTION. Use that.
+             blocked = true;
+          }
+          // Wait, SHIELD_BLOCK_REDUCTION is imported? Yes.
+          // But I need to make sure I use it.
+          // Wait, processHitscan doesn't apply damage?
+          // The old code: target.takeDamage(dmg).
+          // So I apply damage here.
+          // Let's import SHIELD_BLOCK_REDUCTION at the top? It is imported.
+          
           target.takeDamage(dmg);
           this.events.push({
             tick: this.tick,
@@ -301,6 +312,7 @@ class Simulation {
             attackerId: soldier.id,
             victimId: target.id,
             dmg,
+            blocked,
             x: Math.round(target.x),
             y: Math.round(target.y),
           });

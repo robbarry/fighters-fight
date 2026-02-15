@@ -77,9 +77,20 @@ export class Camera {
   screenToWorld(sx, sy) {
     const ux = sx - this.shakeX;
     const uy = sy - this.shakeY;
+    
+    // "Bizarre" aiming fix:
+    // If aiming above the ground horizon (e.g. at the sky or castle walls),
+    // snap aim to the Wall Lane (y=30).
+    // Otherwise, map screen Y to ground Y (0..60).
+    let wy;
+    if (uy < this.groundScreenY) {
+      wy = 30;
+    } else {
+      wy = Math.max(0, Math.min(GROUND_Y_MAX,
+        ((uy - this.groundScreenY) / this.groundBandHeight) * GROUND_Y_MAX));
+    }
+    
     const wx = ux / this.scale + this.x;
-    const wy = Math.max(0, Math.min(GROUND_Y_MAX,
-      ((uy - this.groundScreenY) / this.groundBandHeight) * GROUND_Y_MAX));
     return { x: wx, y: wy };
   }
 

@@ -288,7 +288,7 @@ export class Game {
             this.particles.emit('debris', x, y, 16, { isOnWall });
             this.particles.emit('shockwave', x, y, 1, { isOnWall, size: 100, color: 'rgba(255, 255, 255, 0.4)' });
           }
-          this.hud.addDamageNumber(dmg, x, y, isOnWall, critical);
+          this.hud.addDamageNumber(dmg, x, y, isOnWall, critical, evt.blocked);
         }
 
         if (critical) {

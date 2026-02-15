@@ -30,11 +30,13 @@ export function checkMeleeHit(attacker, target, range) {
 
 export function processMeleeAttack(attacker, target, damage) {
   let actualDamage = damage;
+  let blocked = false;
   if (target.state === STATE_BLOCK) {
     actualDamage *= (1 - SHIELD_BLOCK_REDUCTION);
+    blocked = true;
   }
   target.takeDamage(actualDamage);
-  return { hit: true, damage: actualDamage };
+  return { hit: true, damage: actualDamage, blocked };
 }
 
 export function processHitscan(shooterX, shooterY, aimX, aimY, team, entities, range, opts = {}) {
@@ -125,6 +127,7 @@ export function processProjectileCollisions(projectiles, allEntities, spatialHas
 
     if (hitEntity) {
       let actualDamage = proj.damage;
+      let blocked = false;
       if (proj.type === PROJ_BULLET) {
         const range = proj.maxRange || 1;
         const t = Math.max(0, Math.min(1, (proj.distanceTraveled || 0) / range));
@@ -134,6 +137,7 @@ export function processProjectileCollisions(projectiles, allEntities, spatialHas
       }
       if (hitEntity.state === STATE_BLOCK) {
         actualDamage *= (1 - SHIELD_BLOCK_REDUCTION);
+        blocked = true;
       }
       actualDamage = Math.max(1, actualDamage);
       hitEntity.takeDamage(actualDamage);
@@ -145,6 +149,7 @@ export function processProjectileCollisions(projectiles, allEntities, spatialHas
         attackerId: proj.ownerId,
         victimId: hitEntity.id,
         dmg: Math.round(actualDamage),
+        blocked: !!blocked,
         x: Math.round(hitEntity.x),
         y: Math.round(hitEntity.y),
       });
@@ -161,8 +166,10 @@ export function processProjectileCollisions(projectiles, allEntities, spatialHas
           const ady = ae.y - hitEntity.y;
           if (Math.sqrt(adx * adx + ady * ady) <= ROCK_AOE_RADIUS) {
             let aoeDamage = proj.damage;
+            let aoeBlocked = false;
             if (ae.state === STATE_BLOCK) {
               aoeDamage *= (1 - SHIELD_BLOCK_REDUCTION);
+              aoeBlocked = true;
             }
             aoeDamage = Math.max(1, aoeDamage);
             ae.takeDamage(aoeDamage);
@@ -172,6 +179,7 @@ export function processProjectileCollisions(projectiles, allEntities, spatialHas
               attackerId: proj.ownerId,
               victimId: ae.id,
               dmg: Math.round(aoeDamage),
+              blocked: !!aoeBlocked,
               x: Math.round(ae.x),
               y: Math.round(ae.y),
             });

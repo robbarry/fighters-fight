@@ -131,8 +131,9 @@ export const CATAPULT_CHARGE_DAMAGE_MAX_MULT = 1.35;
 // ─── Combat: General ─────────────────────────────────────
 export const MELEE_Y_FORGIVENESS = 26;
 export const ENGAGE_RANGE = 240;
-export const SHIELD_BLOCK_REDUCTION = 0.8;
+export const SHIELD_BLOCK_REDUCTION = 0.95;
 export const ATTACK_TIMING_VARIANCE = 0.20;
+export const BLOCKED_TEXT = 'BLOCKED';
 
 // ─── Target Selection ────────────────────────────────────
 export const TARGET_NEAREST_PCT = 0.70;

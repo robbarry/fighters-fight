@@ -4,7 +4,7 @@ import { TEAM_BLUE, TEAM_RED, PHASE_LOBBY, PHASE_COUNTDOWN, PHASE_ARMY_MARCH,
          TYPE_ARCHER, TYPE_GUNNER, TYPE_CATAPULT,
          GATE_HP, CASTLE_WIDTH, BLUE_CASTLE_X, RED_CASTLE_X,
          ARROW_RANGE, BULLET_RANGE, ROCK_RANGE,
-         CATAPULT_CHARGE_MS, PLAYER_HP, ROYAL_HP } from '/shared/constants.js';
+         CATAPULT_CHARGE_MS, PLAYER_HP, ROYAL_HP, BLOCKED_TEXT } from '/shared/constants.js';
 import { roleName, roleUsesAim } from './roles.js';
 
 export class HUD {
@@ -21,7 +21,7 @@ export class HUD {
     this.statusToastTimer = 0;
     this.aim = { sx: 0, sy: 0, wx: 0, wy: 0 };
     this.chargeMs = 0;
-    this.damageNumbers = []; // { x,y,isOnWall,amount,critical,ms,total,offX,offY,vy }
+    this.damageNumbers = []; // { x,y,isOnWall,amount,critical,blocked,ms,total,offX,offY,vy }
   }
 
   setAim(sx, sy, wx, wy) {
@@ -40,10 +40,10 @@ export class HUD {
     this.statusToastTimer = ms;
   }
 
-  addDamageNumber(amount, x, y, isOnWall = false, critical = false) {
+  addDamageNumber(amount, x, y, isOnWall = false, critical = false, blocked = false) {
     if (amount == null) return;
     const n = Math.round(amount);
-    if (!Number.isFinite(n) || n <= 0) return;
+    if (!Number.isFinite(n) || (n <= 0 && !blocked)) return;
     const total = critical ? 1100 : 900;
     this.damageNumbers.push({
       x: x || 0,
@@ -51,6 +51,7 @@ export class HUD {
       isOnWall: !!isOnWall,
       amount: n,
       critical: !!critical,
+      blocked: !!blocked,
       ms: total,
       total,
       offX: (Math.random() * 2 - 1) * 10,
@@ -592,14 +593,26 @@ export class HUD {
 
       ctx.save();
       ctx.globalAlpha = 0.95 * a;
-      ctx.font = dn.critical ? '900 18px system-ui' : '900 14px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = dn.critical ? '#ffdd44' : '#ffffff';
-      ctx.strokeStyle = 'rgba(0,0,0,0.70)';
-      ctx.lineWidth = dn.critical ? 5 : 4;
-      const text = `-${dn.amount}`;
-      ctx.strokeText(text, sx, sy);
-      ctx.fillText(text, sx, sy);
+      
+      if (dn.blocked) {
+          ctx.font = 'bold 12px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#B0BEC5'; // Gray
+          ctx.strokeStyle = 'rgba(0,0,0,0.70)';
+          ctx.lineWidth = 3;
+          const text = `${BLOCKED_TEXT} (-${dn.amount})`;
+          ctx.strokeText(text, sx, sy);
+          ctx.fillText(text, sx, sy);
+      } else {
+          ctx.font = dn.critical ? '900 18px system-ui' : '900 14px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = dn.critical ? '#ffdd44' : '#ffffff';
+          ctx.strokeStyle = 'rgba(0,0,0,0.70)';
+          ctx.lineWidth = dn.critical ? 5 : 4;
+          const text = `-${dn.amount}`;
+          ctx.strokeText(text, sx, sy);
+          ctx.fillText(text, sx, sy);
+      }
       ctx.restore();
     }
   }
