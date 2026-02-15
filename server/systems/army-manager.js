@@ -47,11 +47,11 @@ class ArmyManager {
     spawnBatch(ARMY_SPEAR_COUNT, TYPE_SPEAR, TEAM_BLUE,
       BLUE_GROUND_SPAWN_MIN, BLUE_GROUND_SPAWN_MAX, 0, GROUND_Y_MAX);
 
-    // Blue army - wall units (y=30 centered in ground band)
+    // Blue army - ranged (now on ground for better battle flow)
     spawnBatch(ARMY_ARCHER_COUNT, TYPE_ARCHER, TEAM_BLUE,
-      BLUE_WALL_SPAWN_MIN, BLUE_WALL_SPAWN_MAX, 30, 30);
+      BLUE_GROUND_SPAWN_MIN, BLUE_GROUND_SPAWN_MAX, 0, GROUND_Y_MAX);
     spawnBatch(ARMY_GUNNER_COUNT, TYPE_GUNNER, TEAM_BLUE,
-      BLUE_WALL_SPAWN_MIN, BLUE_WALL_SPAWN_MAX, 30, 30);
+      BLUE_GROUND_SPAWN_MIN, BLUE_GROUND_SPAWN_MAX, 0, GROUND_Y_MAX);
 
     // Red army - ground units
     spawnBatch(ARMY_SWORD_COUNT, TYPE_SWORD, TEAM_RED,
@@ -59,11 +59,11 @@ class ArmyManager {
     spawnBatch(ARMY_SPEAR_COUNT, TYPE_SPEAR, TEAM_RED,
       RED_GROUND_SPAWN_MIN, RED_GROUND_SPAWN_MAX, 0, GROUND_Y_MAX);
 
-    // Red army - wall units
+    // Red army - ranged (now on ground)
     spawnBatch(ARMY_ARCHER_COUNT, TYPE_ARCHER, TEAM_RED,
-      RED_WALL_SPAWN_MIN, RED_WALL_SPAWN_MAX, 30, 30);
+      RED_GROUND_SPAWN_MIN, RED_GROUND_SPAWN_MAX, 0, GROUND_Y_MAX);
     spawnBatch(ARMY_GUNNER_COUNT, TYPE_GUNNER, TEAM_RED,
-      RED_WALL_SPAWN_MIN, RED_WALL_SPAWN_MAX, 30, 30);
+      RED_GROUND_SPAWN_MIN, RED_GROUND_SPAWN_MAX, 0, GROUND_Y_MAX);
 
     return id;
   }

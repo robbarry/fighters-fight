@@ -71,7 +71,7 @@ class Player extends Entity {
     this.respawnTimer = 0;
     this.shoutCooldown = 0;
     this.socketId = null;
-    this.isOnWall = role === TYPE_ARCHER || role === TYPE_GUNNER;
+    this.isOnWall = false; // All roles now on ground for better battle flow
     this.isHuman = true;
     this.controlsRoyalId = null; // when set, player input drives that royal (FINAL_STAND)
 

@@ -77,6 +77,15 @@ export class ParticleSystem {
           p.vrot = (Math.random() - 0.5) * 8;
           p.bounce = true;
           break;
+        case 'shockwave':
+          p.shape = 'shockwave';
+          p.vx = 0;
+          p.vy = 0;
+          p.maxLife = 500;
+          p.size = 10;
+          p.maxSize = opts.size || 100;
+          p.color = opts.color || 'rgba(255, 255, 255, 0.5)';
+          break;
         default:
           p.vx = (Math.random() - 0.5) * 50;
           p.vy = -Math.random() * 50;
@@ -97,6 +106,10 @@ export class ParticleSystem {
       p.y += p.vy * dtSec;
       p.vy += this._gravity * dtSec; // gravity
       p.rot += p.vrot * dtSec;
+
+      if (p.shape === 'shockwave') {
+        p.size += (p.maxSize - p.size) * 5 * dtSec;
+      }
 
       // Simple ground bounce for world-space particles.
       if (!p.isOnWall && p.bounce && p.y >= GROUND_Y_MAX) {
@@ -150,6 +163,12 @@ export class ParticleSystem {
         ctx.beginPath();
         ctx.moveTo(x, y);
         ctx.lineTo(x - ux * len, y - uy * len);
+        ctx.stroke();
+      } else if (p.shape === 'shockwave') {
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 4 * camera.scale;
+        ctx.beginPath();
+        ctx.ellipse(x, y, p.size * camera.scale, p.size * 0.4 * camera.scale, 0, 0, Math.PI * 2);
         ctx.stroke();
       } else if (p.shape === 'chunk') {
         ctx.translate(x, y);

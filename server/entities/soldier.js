@@ -83,7 +83,7 @@ class Soldier extends Entity {
     this.target = null;
     this.targetRefreshTimer = 0;
     this.deathTimer = 0;
-    this.isOnWall = type === TYPE_ARCHER || type === TYPE_GUNNER;
+    this.isOnWall = false; // ArmyManager sets this if needed, but default to ground
     this.isRemovable = false;
     this.isHuman = false;
 

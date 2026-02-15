@@ -1,3 +1,5 @@
+import { TICK_MS } from '/shared/constants.js';
+
 export class Interpolation {
   constructor() {
     this.snapshots = [];
@@ -27,7 +29,7 @@ export class Interpolation {
 
     const now = performance.now();
     const elapsed = now - this._lastPushTime;
-    const tickMs = 50; // 20Hz
+    const tickMs = TICK_MS || 50;
     const t = Math.min(1, elapsed / tickMs);
 
     return this._lerp(snap1, snap2, t);
