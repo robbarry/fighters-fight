@@ -179,8 +179,13 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
       if (player.chargeMs > CATAPULT_CHARGE_MS) player.chargeMs = CATAPULT_CHARGE_MS;
     }
 
+    // Fire when: (a) released after minimum charge, or (b) reached max charge
     const released = player._prevAtk && !atk;
-    if (ready && released) {
+    const minChargeMs = 150; // ignore accidental taps
+    const maxedOut = player.chargeMs >= CATAPULT_CHARGE_MS;
+    const shouldFire = ready && player.chargeMs >= minChargeMs && (released || maxedOut);
+
+    if (shouldFire) {
       const chargePct = CATAPULT_CHARGE_MS > 0
         ? Math.max(0, Math.min(1, player.chargeMs / CATAPULT_CHARGE_MS))
         : 0;
@@ -194,8 +199,6 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
       const vx = alen > 0 ? (adx / alen) * speed : speed;
       const vy = alen > 0 ? (ady / alen) * speed : 0;
 
-      // Rocks should "land" where you aimed (clamped to weapon range) so the
-      // client-side arc completes instead of disappearing mid-flight.
       const rockRange = player.attackRange || ROCK_RANGE;
       const targetDist = alen > 0 ? Math.min(alen, rockRange) : rockRange;
 
@@ -204,7 +207,6 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
         player.x, player.y, vx, vy, player.id,
         targetDist
       );
-      // Treat the landing distance as the rock's max travel distance.
       proj.maxRange = targetDist;
       proj.damage = Math.round(proj.damage * damageMult);
       simulation.projectiles.push(proj);
@@ -219,6 +221,11 @@ export function updatePlayer(player, dt, blueEntities, redEntities, simulation) 
 
       const variance = 1 + (Math.random() * 2 - 1) * ATTACK_TIMING_VARIANCE;
       player.attackCooldownTimer = player.attackCooldownBase * variance;
+      player.chargeMs = 0;
+    }
+
+    // Reset charge if released without enough charge (accidental tap)
+    if (released && player.chargeMs < minChargeMs) {
       player.chargeMs = 0;
     }
 

@@ -39,7 +39,7 @@ export const ROLES = [
     type: TYPE_CATAPULT,
     name: 'Catapult',
     icon: '\uD83E\uDEA8',
-    desc: 'Aim with the mouse. Click and hold to charge, release to launch a rock. Space: rapid fire.',
+    desc: 'Aim with the mouse. Hold click to charge a rock, release to fire. Full charge auto-fires. Space: rapid fire.',
     usesAim: true,
   },
 ];

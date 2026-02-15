@@ -194,8 +194,31 @@ export class Game {
     this.hud.update(dt);
 
     // Catapult charge meter (client-side estimate)
-    if (this._localRole === TYPE_CATAPULT && this.input.isAttacking()) {
-      this._localChargeMs = Math.min(CATAPULT_CHARGE_MS, this._localChargeMs + dt);
+    if (this._localRole === TYPE_CATAPULT) {
+      if (this.input.isAttacking()) {
+        this._localChargeMs = Math.min(CATAPULT_CHARGE_MS, this._localChargeMs + dt);
+        this._chargeFired = false;
+        // Auto-fire visual: flash bar when maxed
+        if (this._localChargeMs >= CATAPULT_CHARGE_MS) {
+          this._chargeFired = true;
+          this._chargeFadeMs = 300; // brief fade after auto-fire
+        }
+      } else if (this._localChargeMs > 0 && !this._chargeFired) {
+        // Released: show the charge level briefly then fade
+        this._chargeFired = true;
+        this._chargeFadeMs = 300;
+      }
+
+      if (this._chargeFired) {
+        if (this._chargeFadeMs != null) {
+          this._chargeFadeMs -= dt;
+          if (this._chargeFadeMs <= 0) {
+            this._localChargeMs = 0;
+            this._chargeFadeMs = null;
+            this._chargeFired = false;
+          }
+        }
+      }
     } else {
       this._localChargeMs = 0;
     }
