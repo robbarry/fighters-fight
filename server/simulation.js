@@ -520,10 +520,10 @@ class Simulation {
         const queen = new Royal(this.genId(), false, losingTeam, castleCenter + 30, 30);
 
         if (this.isSolo) {
-          king.hp = 750;
-          king.maxHp = 750;
-          queen.hp = 750;
-          queen.maxHp = 750;
+          king.hp = 70;
+          king.maxHp = 70;
+          queen.hp = 70;
+          queen.maxHp = 70;
         }
 
                 // Assign human players to royals
